@@ -40,6 +40,7 @@ model Tenant {
   routines      Routine[]
   auditLogs     AuditLog[]
   checkins      Checkin[]
+  payments      Payment[]
 }
 
 model User {
@@ -59,6 +60,7 @@ model User {
   checkins      Checkin[]
   routines      Routine[] // Routines assigned to this user
   auditLogs     AuditLog[] // Actions performed by this user
+  payments      Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -92,9 +94,40 @@ model Subscription {
   status    SubscriptionStatus @default(ACTIVE)
   startDate DateTime           @default(now())
   endDate   DateTime
+  
+  payments  Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Decimal
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  method        String        // CARD, CASH, TRANSFER, ETC
+  provider      String?       // STRIPE, MERCADOPAGO, MANUAL
+  transactionId String?       // External ID
+
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
 }
 
 model AccessKey {
