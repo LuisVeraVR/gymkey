@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  GYM_ADMIN
+  STAFF
+  COACH
+  MEMBER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELED
+}
+
+enum CheckinStatus {
+  GRANTED
+  DENIED
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  config    Json?    // Custom configurations like grace period
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  plans         Plan[]
+  routines      Routine[]
+  auditLogs     AuditLog[]
+  checkins      Checkin[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  photo     String?
+  role      UserRole @default(MEMBER)
+  isActive  Boolean  @default(true)
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+
+  subscription  Subscription?
+  accessKey     AccessKey?
+  checkins      Checkin[]
+  routines      Routine[] // Routines assigned to this user
+  auditLogs     AuditLog[] // Actions performed by this user
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        String
+  price       Decimal
+  duration    Int      // In days
+  description String?
+  features    String[] // Array of strings for features
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String             @unique
+  user      User               @relation(fields: [userId], references: [id])
+  
+  planId    String
+  plan      Plan               @relation(fields: [planId], references: [id])
+
+  status    SubscriptionStatus @default(ACTIVE)
+  startDate DateTime           @default(now())
+  endDate   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AccessKey {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  token     String?  // Current valid token hash or similar
+  expiresAt DateTime?
+
+  updatedAt DateTime @updatedAt
+}
+
+model Checkin {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+
+  status    CheckinStatus
+  method    String        @default("QR") // QR, MANUAL, ETC
+  details   String?       // Reason for denial etc.
+  
+  timestamp DateTime      @default(now())
+}
+
+model Routine {
+  id        String   @id @default(uuid())
+  name      String
+  content   Json     // Structure of the routine (exercises, sets, reps)
+  
+  userId    String   // Assigned to
+  user      User     @relation(fields: [userId], references: [id])
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  coachId   String?  // Created by
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  details   Json?
+  
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  
+  timestamp DateTime @default(now())
+}
