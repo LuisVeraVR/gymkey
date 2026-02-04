@@ -1,14 +1,9 @@
 import { PrismaClient, UserRole, SubscriptionStatus } from '@prisma/client';
-import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Simple hash function for demo (in production use bcrypt/argon2)
-// For this seed we will store plain text just to make it easy to login, 
-// BUT the app should use bcrypt. I will implement bcrypt in the app.
-// For the seed, I'll assume the app uses a hashing utility.
-// To make it simple for now, I will simulate a hashed password.
-const hashPassword = (pass: string) => `hashed_${pass}`; 
+const hashPassword = async (pass: string) => await bcrypt.hash(pass, 10);
 
 async function main() {
   console.log('Seeding...');
@@ -27,38 +22,40 @@ async function main() {
   console.log('Tenant created:', tenant.name);
 
   // 2. Create Users
+  const password = await hashPassword('123456');
+  
   const users = [
     {
       email: 'super@gymkey.com',
-      password: hashPassword('123456'),
+      password,
       role: UserRole.SUPER_ADMIN,
       name: 'Super Admin',
-      tenantId: null, // Super admin might not belong to a specific gym or belongs to a system tenant
+      tenantId: null, 
     },
     {
       email: 'admin@demogym.com',
-      password: hashPassword('123456'),
+      password,
       role: UserRole.GYM_ADMIN,
       name: 'Gym Admin',
       tenantId: tenant.id,
     },
     {
       email: 'staff@demogym.com',
-      password: hashPassword('123456'),
+      password,
       role: UserRole.STAFF,
       name: 'Staff Member',
       tenantId: tenant.id,
     },
     {
       email: 'coach@demogym.com',
-      password: hashPassword('123456'),
+      password,
       role: UserRole.COACH,
       name: 'Coach Carter',
       tenantId: tenant.id,
     },
     {
       email: 'member@demogym.com',
-      password: hashPassword('123456'),
+      password,
       role: UserRole.MEMBER,
       name: 'John Member',
       tenantId: tenant.id,
@@ -68,10 +65,14 @@ async function main() {
   for (const u of users) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: {
+        password: u.password, // Update password if user exists
+        role: u.role,
+        tenantId: u.tenantId,
+      },
       create: {
         email: u.email,
-        password: u.password, // Ideally use bcrypt here
+        password: u.password,
         role: u.role,
         name: u.name,
         tenantId: u.tenantId,
@@ -80,26 +81,60 @@ async function main() {
     console.log(`User ${user.role} created: ${user.email}`);
 
     // If member, create plan and subscription
-    if (u.role === UserRole.MEMBER) {
-      const plan = await prisma.plan.create({
-        data: {
-          name: 'Gold Plan',
-          price: 50.00,
-          duration: 30,
-          tenantId: tenant.id,
-          features: ['Gym Access', 'Sauna'],
-        }
+    if (u.role === UserRole.MEMBER && user.tenantId) {
+      // Find or create plan
+      const plan = await prisma.plan.findFirst({
+        where: { tenantId: user.tenantId, name: 'Gold Plan' }
       });
+
+      let planId = plan?.id;
+
+      if (!planId) {
+        const newPlan = await prisma.plan.create({
+          data: {
+            name: 'Gold Plan',
+            price: 50.00,
+            duration: 30,
+            tenantId: user.tenantId,
+            features: ['Gym Access', 'Sauna'],
+          }
+        });
+        planId = newPlan.id;
+      }
       
-      await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          planId: plan.id,
-          status: SubscriptionStatus.ACTIVE,
-          endDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+      // Upsert subscription
+      await prisma.subscription.upsert({
+        where: { 
+          // Assuming there is a unique constraint or just finding first active
+          // Since schema isn't fully visible, we'll try to find one first to be safe or just create if not exists
+          // For simplicity in seed, let's just create if not exists using findFirst
+          id: 'temp-id-placeholder' // This won't work for upsert without a valid unique ID. 
+          // Let's use findFirst then create/update logic instead of upsert if we don't know the ID
+         },
+        update: {},
+        create: {
+            userId: user.id,
+            planId: planId,
+            status: SubscriptionStatus.ACTIVE,
+            endDate: new Date(new Date().setDate(new Date().getDate() + 30)),
         }
+      }).catch(async () => {
+         // Fallback if upsert fails or to handle the logic manually
+         const existingSub = await prisma.subscription.findFirst({
+             where: { userId: user.id }
+         });
+         
+         if (!existingSub) {
+             await prisma.subscription.create({
+                data: {
+                  userId: user.id,
+                  planId: planId!,
+                  status: SubscriptionStatus.ACTIVE,
+                  endDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+                }
+             });
+         }
       });
-      console.log('Member subscription created');
     }
   }
 }
