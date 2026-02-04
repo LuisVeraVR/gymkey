@@ -295,7 +295,7 @@ export default function AuditPage() {
           <h1 className="text-2xl font-bold text-foreground">Auditoria</h1>
           <p className="text-muted-foreground mt-1">Registro de todas las actividades del sistema</p>
         </div>
-        <button className="h-10 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+        <button className="h-9 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -314,7 +314,7 @@ export default function AuditPage() {
             placeholder="Buscar en el log..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            className="w-full h-9 pl-10 pr-4 bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
           />
         </div>
         
@@ -329,7 +329,7 @@ export default function AuditPage() {
             <button
               key={option.value}
               onClick={() => setFilter(option.value as FilterType)}
-              className={`h-10 px-4 text-sm font-medium rounded-lg transition-colors ${
+              className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors ${
                 filter === option.value
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-secondary hover:bg-secondary-hover text-secondary-foreground'
@@ -389,7 +389,7 @@ export default function AuditPage() {
       {/* Load More */}
       {filteredEvents.length > 0 && (
         <div className="flex justify-center">
-          <button className="h-10 px-6 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors">
+          <button className="h-9 px-6 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors">
             Cargar mas eventos
           </button>
         </div>

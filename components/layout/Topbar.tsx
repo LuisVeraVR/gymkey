@@ -20,17 +20,12 @@ export default function Topbar() {
   const badge = getRoleBadge(user?.role || '');
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-8 sticky top-0 z-40">
+    <header className="h-16 flex items-center justify-between px-8 sticky top-0 z-40 bg-transparent">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          <span className="text-sm text-muted-foreground">
-            {user?.tenantId ? 'Fitness Center Pro' : 'GymKey Platform'}
-          </span>
-        </div>
+        {/* Breadcrumb or Page Title could go here */}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 bg-card/50 backdrop-blur-xl p-1.5 pr-2 rounded-full border border-border/40 shadow-sm">
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${badge.className}`}>
           {badge.label}
         </span>
@@ -38,23 +33,11 @@ export default function Topbar() {
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-secondary transition-colors"
+            className="flex items-center gap-3 rounded-full hover:bg-muted/50 transition-colors pr-1"
           >
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{user?.name}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm border border-primary/30">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-xs shadow-md shadow-primary/20">
               {user?.name?.charAt(0).toUpperCase() || 'A'}
             </div>
-            <svg 
-              className={`w-4 h-4 text-muted-foreground transition-transform ${showDropdown ? 'rotate-180' : ''}`} 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
           </button>
 
           {showDropdown && (
@@ -63,12 +46,12 @@ export default function Topbar() {
                 className="fixed inset-0 z-40" 
                 onClick={() => setShowDropdown(false)} 
               />
-              <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 animate-fadeIn overflow-hidden">
-                <div className="p-3 border-b border-border">
-                  <p className="text-sm font-medium text-foreground">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <div className="absolute right-0 mt-3 w-56 bg-card/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 animate-fadeIn overflow-hidden">
+                <div className="p-4 border-b border-border/50 bg-muted/30">
+                  <p className="text-sm font-semibold text-foreground">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
                 </div>
-                <div className="p-1">
+                <div className="p-1.5">
                   <button
                     onClick={() => {
                       setShowDropdown(false);
