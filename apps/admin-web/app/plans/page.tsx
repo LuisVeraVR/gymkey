@@ -66,7 +66,7 @@ export default function PlansPage() {
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-colors flex items-center"
+          className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 rounded-lg shadow transition-colors flex items-center"
         >
           <span className="mr-2">+</span> Nuevo Plan
         </button>
@@ -88,11 +88,11 @@ export default function PlansPage() {
             <div className="flex gap-2 border-t pt-4 border-slate-100">
                 <button 
                     onClick={() => deletePlan(plan.id)}
-                    className="flex-1 text-red-600 hover:bg-red-50 py-2 rounded text-sm font-medium transition-colors"
+                    className="flex-1 text-red-600 hover:bg-red-50 h-9 rounded text-sm font-medium transition-colors flex items-center justify-center"
                 >
                     Eliminar
                 </button>
-                <button className="flex-1 text-blue-600 hover:bg-blue-50 py-2 rounded text-sm font-medium transition-colors">
+                <button className="flex-1 text-blue-600 hover:bg-blue-50 h-9 rounded text-sm font-medium transition-colors flex items-center justify-center">
                     Editar
                 </button>
             </div>
@@ -123,7 +123,7 @@ export default function PlansPage() {
                   type="text" 
                   placeholder="Ej: Mensual Premium"
                   required
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full h-9 px-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={formData.name}
                   onChange={e => setFormData({...formData, name: e.target.value})}
                 />
@@ -137,7 +137,7 @@ export default function PlansPage() {
                     placeholder="29.99"
                     step="0.01"
                     required
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full h-9 px-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={formData.price}
                     onChange={e => setFormData({...formData, price: e.target.value})}
                     />
@@ -148,7 +148,7 @@ export default function PlansPage() {
                     type="number" 
                     placeholder="30"
                     required
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full h-9 px-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={formData.durationDays}
                     onChange={e => setFormData({...formData, durationDays: parseInt(e.target.value)})}
                     />
@@ -169,13 +169,13 @@ export default function PlansPage() {
                 <button 
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                  className="h-9 px-4 text-slate-600 hover:bg-slate-100 rounded-lg flex items-center"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="h-9 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
                 >
                   Guardar Plan
                 </button>

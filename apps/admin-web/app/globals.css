@@ -2,44 +2,44 @@
 
 :root {
   /* Dark Mode - Primary Theme */
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #030303; /* Deeper black for more contrast */
+  --foreground: #fcfcfc;
   
   /* Card & Surface */
-  --card: #18181b;
+  --card: #0f0f11; /* Slightly lighter than bg */
   --card-foreground: #fafafa;
-  --card-hover: #27272a;
+  --card-hover: #18181b;
   
   /* Popover & Dropdown */
-  --popover: #18181b;
+  --popover: #0f0f11;
   --popover-foreground: #fafafa;
   
-  /* Primary - Emerald/Teal Accent */
+  /* Primary - Emerald/Teal Accent - Adjusted for vibrancy */
   --primary: #10b981;
-  --primary-foreground: #022c22;
+  --primary-foreground: #ffffff;
   --primary-hover: #059669;
   
   /* Secondary */
-  --secondary: #27272a;
+  --secondary: #18181b;
   --secondary-foreground: #fafafa;
-  --secondary-hover: #3f3f46;
+  --secondary-hover: #27272a;
   
   /* Muted */
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
+  --muted: #18181b;
+  --muted-foreground: #71717a; /* More subtle text */
   
   /* Accent */
-  --accent: #27272a;
+  --accent: #18181b;
   --accent-foreground: #fafafa;
   
   /* Destructive */
   --destructive: #ef4444;
   --destructive-foreground: #fafafa;
   
-  /* Border & Input */
-  --border: #27272a;
-  --border-hover: #3f3f46;
-  --input: #27272a;
+  /* Border & Input - MUCH softer */
+  --border: #1f1f22; 
+  --border-hover: #27272a;
+  --input: #18181b;
   --ring: #10b981;
   
   /* Success, Warning, Info */
@@ -50,8 +50,8 @@
   --info: #3b82f6;
   --info-foreground: #eff6ff;
   
-  /* Sidebar */
-  --sidebar: #0f0f11;
+  /* Sidebar - Blends better with background */
+  --sidebar: #050505;
   --sidebar-foreground: #a1a1aa;
   --sidebar-hover: #18181b;
   --sidebar-active: #10b981;
@@ -63,8 +63,8 @@
   --chart-4: #ef4444;
   --chart-5: #8b5cf6;
   
-  /* Radius */
-  --radius: 0.5rem;
+  /* Radius - More rounded for modern feel */
+  --radius: 0.75rem;
 }
 
 @theme inline {
@@ -110,7 +110,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-sans: var(--font-stack-text), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-stack-headline), ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
 }
 
@@ -124,6 +125,11 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
 }
 
 /* Custom scrollbar for dark mode */

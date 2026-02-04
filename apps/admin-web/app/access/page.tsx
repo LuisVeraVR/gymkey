@@ -157,7 +157,7 @@ export default function AccessControlPage() {
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Escanea el codigo QR aqui..."
-                  className="w-full h-14 px-5 bg-background border-2 border-border rounded-xl text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full h-9 px-4 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                   autoComplete="off"
                 />
                 {token && (
@@ -176,7 +176,7 @@ export default function AccessControlPage() {
               <button
                 type="submit"
                 disabled={loading || !token.trim()}
-                className="w-full h-12 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-9 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -267,7 +267,7 @@ export default function AccessControlPage() {
                     </div>
                     <button
                       onClick={clearResult}
-                      className="h-10 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors"
+                      className="h-9 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors"
                     >
                       Nuevo Escaneo
                     </button>

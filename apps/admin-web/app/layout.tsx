@@ -1,69 +1,46 @@
-'use client';
-
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider, useAuth } from "@/context/auth-context";
-import Sidebar from "@/components/layout/Sidebar";
-import Topbar from "@/components/layout/Topbar";
-import { usePathname } from 'next/navigation';
+import { AuthProvider } from "@/context/auth-context";
+import MainLayout from "@/components/layout/MainLayout";
+import serverApi from "@/lib/server-api";
 
-const inter = Inter({
+// Using Inter as a proxy for Stack Sans Text since we don't have the proprietary files
+const stackSansText = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-stack-text",
+  display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+// Using Inter with tighter tracking for Headline feel
+const stackSansHeadline = Inter({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
+  variable: "--font-stack-headline",
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        <span className="text-muted-foreground text-sm">Cargando...</span>
-      </div>
-    </div>
-  );
-}
-
-function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const pathname = usePathname();
-  
-  if (loading) return <LoadingScreen />;
-  
-  const isLoginPage = pathname === '/login';
-
-  if (!user || isLoginPage) {
-    return <>{children}</>;
+async function getUser() {
+  try {
+    const { data } = await serverApi.get('/auth/me');
+    return data;
+  } catch (error) {
+    return null;
   }
-
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 flex flex-col ml-64">
-        <Topbar />
-        <main className="flex-1 overflow-auto p-8">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getUser();
+
   return (
     <html lang="es" className="dark">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${stackSansText.variable} ${stackSansHeadline.variable} font-sans antialiased`}
       >
-        <AuthProvider>
+        <AuthProvider initialUser={user}>
           <MainLayout>{children}</MainLayout>
         </AuthProvider>
       </body>

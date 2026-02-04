@@ -74,52 +74,46 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 w-64 h-screen bg-sidebar border-r border-border flex flex-col z-50">
+    <aside className="fixed left-0 top-0 w-64 h-screen bg-card/50 backdrop-blur-xl border-r border-border/40 flex flex-col z-50 transition-all duration-300">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+      <div className="h-16 flex items-center px-6">
+        <Link href="/dashboard" className="flex items-center gap-3 group">
+          <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform duration-300">
             <svg className="w-5 h-5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
             </svg>
           </div>
-          <span className="text-lg font-semibold text-foreground tracking-tight">
+          <span className="text-lg font-bold text-foreground tracking-tight">
             Gym<span className="text-primary">Key</span>
           </span>
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border/50">
+        <p className="px-3 text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider mb-2">Menu</p>
         {menuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                isActive 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <span className={isActive ? 'text-primary' : ''}>{item.icon}</span>
-              <span>{item.name}</span>
-              {isActive && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-              )}
+              <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                {item.icon}
+              </div>
+              {item.name}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-border">
-        <div className="px-3 py-2">
-          <p className="text-xs text-muted-foreground">GymKey Admin</p>
-          <p className="text-xs text-muted-foreground/60">v2.0.0</p>
-        </div>
-      </div>
+      {/* Footer / User Info could go here if needed, but keeping it clean for now */}
     </aside>
   );
 }

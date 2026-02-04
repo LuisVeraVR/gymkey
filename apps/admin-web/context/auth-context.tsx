@@ -16,7 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (token: string, userData: User) => void;
+  login: (userData: User) => void;
   logout: () => void;
 }
 
@@ -27,47 +27,27 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children, initialUser }: { children: React.ReactNode; initialUser: User | null }) {
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    const initAuth = async () => {
-      const token = Cookies.get('token');
-      if (!token) {
-        setLoading(false);
-        if (pathname !== '/login') {
-          // Si no hay token y no estamos en login, redirigir
-          // Nota: Middleware se encarga de esto, pero doble check no daña
-        }
-        return;
-      }
-
-      try {
-        // Validar token y obtener usuario actualizado
-        const { data } = await api.get('/auth/me');
-        setUser(data);
-      } catch (error) {
-        console.error('Session expired', error);
-        logout();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []);
-
-  const login = (token: string, userData: User) => {
-    Cookies.set('token', token, { expires: 1 }); // 1 dia
+  // We can keep a simplified effect to handle revalidation or client-side only logic if needed
+  // But for the main requirement (hiding network request), we rely on initialUser
+  
+  const login = (userData: User) => {
+    // Cookie is set by server
     setUser(userData);
     router.push('/dashboard');
   };
 
-  const logout = () => {
-    Cookies.remove('token');
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
     setUser(null);
     router.push('/login');
   };
