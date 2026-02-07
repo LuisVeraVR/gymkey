@@ -7,12 +7,14 @@ import { UserRole, Prisma } from '@prisma/client';
 
 @Controller('plans')
 export class PlansController {
-  constructor(private readonly plansService: PlansService) {}
+  constructor(
+    private readonly plansService: PlansService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  create(@Request() req: any, @Body() createPlanDto: any) {
+  async create(@Request() req: any, @Body() createPlanDto: any) {
     const { durationDays, ...rest } = createPlanDto;
     const data: Prisma.PlanCreateInput = {
       ...rest,
@@ -31,7 +33,21 @@ export class PlansController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Delete(':id')
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  remove(@Param('id') id: string) {
+  async remove(@Request() req: any, @Param('id') id: string) {
     return this.plansService.remove(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Patch(':id')
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  async update(@Request() req: any, @Param('id') id: string, @Body() updatePlanDto: any) {
+    const { durationDays, ...rest } = updatePlanDto;
+    const data: Prisma.PlanUpdateInput = {
+      ...rest,
+    };
+    if (durationDays !== undefined) {
+      data.duration = durationDays;
+    }
+    return this.plansService.update(id, data);
   }
 }

@@ -9,6 +9,10 @@ import { AccessKeysModule } from './access-keys/access-keys.module';
 import { PlansModule } from './plans/plans.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PaymentsModule } from './payments/payments.module';
+import { RoutinesModule } from './routines/routines.module';
+import { SettingsModule } from './settings/settings.module';
+import { DiscountsModule } from './discounts/discounts.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +26,10 @@ import { PaymentsModule } from './payments/payments.module';
     PlansModule,
     SubscriptionsModule,
     PaymentsModule,
+    RoutinesModule,
+    SettingsModule,
+    DiscountsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

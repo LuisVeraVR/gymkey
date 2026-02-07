@@ -15,8 +15,12 @@ export class PaymentsController {
 
   @Post()
   create(@Body() createPaymentDto: CreatePaymentDto, @Request() req: any) {
-    // User pays for themselves
-    return this.paymentsService.create(createPaymentDto, req.user.id, req.user.tenantId);
+    // If userId is provided and user is admin, use it. Otherwise use current user.
+    const targetUserId = (createPaymentDto.userId && ['GYM_ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) 
+      ? createPaymentDto.userId 
+      : req.user.id;
+
+    return this.paymentsService.create(createPaymentDto, targetUserId, req.user.tenantId);
   }
 
   @Public()
@@ -32,18 +36,51 @@ export class PaymentsController {
     return this.paymentsService.findAll(req.user.tenantId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  @Get('report')
+  findByDateRange(
+    @Request() req: any,
+    @Body('startDate') startDate: string,
+    @Body('endDate') endDate: string,
+  ) {
+    return this.paymentsService.findByDateRange(
+      req.user.tenantId,
+      new Date(startDate),
+      new Date(endDate),
+    );
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.MEMBER)
+  @Get('my-payments')
+  findMyPayments(@Request() req: any) {
+    return this.paymentsService.findByUser(req.user.id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.paymentsService.findOne(id);
   }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-  //   return this.paymentsService.update(id, updatePaymentDto);
-  // }
+  @Patch(':id/refund')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  refund(@Param('id') id: string) {
+    return this.paymentsService.refund(id);
+  }
 
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.paymentsService.remove(id);
-  // }
+  @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
+    return this.paymentsService.update(id, updatePaymentDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  remove(@Param('id') id: string) {
+    return this.paymentsService.remove(id);
+  }
 }

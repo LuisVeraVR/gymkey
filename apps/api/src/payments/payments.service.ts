@@ -114,6 +114,7 @@ export class PaymentsService {
   }
 
   findAll(tenantId: string) {
+    if (!tenantId) return [];
     return this.prisma.payment.findMany({
       where: { tenantId },
       include: { user: true, subscription: { include: { plan: true } } },
@@ -125,11 +126,68 @@ export class PaymentsService {
     return this.prisma.payment.findUnique({ where: { id } });
   }
 
+  async refund(id: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: { subscription: true }
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== PaymentStatus.COMPLETED) {
+      throw new Error('Only completed payments can be refunded');
+    }
+
+    // 1. Mark payment as refunded
+    const refundedPayment = await this.prisma.payment.update({
+      where: { id },
+      data: { status: PaymentStatus.REFUNDED },
+    });
+
+    // 2. If associated with a subscription, we might want to cancel/suspend it or leave it to manual intervention.
+    // For now, let's just log it or optionally suspend the subscription.
+    if (payment.subscriptionId) {
+       await this.prisma.subscription.update({
+         where: { id: payment.subscriptionId },
+         data: { status: SubscriptionStatus.CANCELED }
+       });
+    }
+
+    return refundedPayment;
+  }
+
+  async findByUser(userId: string) {
+    return this.prisma.payment.findMany({
+      where: { userId },
+      include: { subscription: { include: { plan: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findByDateRange(tenantId: string, startDate: Date, endDate: Date) {
+    return this.prisma.payment.findMany({
+      where: {
+        tenantId,
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: { user: true, subscription: { include: { plan: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   update(id: string, updatePaymentDto: UpdatePaymentDto) {
-    return `This action updates a #${id} payment`;
+    return this.prisma.payment.update({
+      where: { id },
+      data: updatePaymentDto,
+    });
   }
 
   remove(id: string) {
-    return `This action removes a #${id} payment`;
+    return this.prisma.payment.delete({ where: { id } });
   }
 }

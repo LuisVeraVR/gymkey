@@ -37,6 +37,7 @@ model Tenant {
 
   users         User[]
   plans         Plan[]
+  discounts     Discount[]
   routines      Routine[]
   auditLogs     AuditLog[]
   checkins      Checkin[]
@@ -51,6 +52,13 @@ model User {
   photo     String?
   role      UserRole @default(MEMBER)
   isActive  Boolean  @default(true)
+  
+  // MFA fields
+  mfaSecret    String?
+  mfaEnabled   Boolean  @default(false)
+  mfaSkipCount Int      @default(0)
+  
+  mustChangePassword Boolean @default(false)
   
   tenantId  String?
   tenant    Tenant?  @relation(fields: [tenantId], references: [id])
@@ -69,18 +77,40 @@ model User {
 model Plan {
   id          String   @id @default(uuid())
   name        String
+  type        String   @default("Mensual")
   price       Decimal
   duration    Int      // In days
   description String?
+  active      Boolean  @default(true)
   features    String[] // Array of strings for features
   
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   
   subscriptions Subscription[]
+  discounts     Discount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Discount {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // 'PERCENTAGE' | 'FIXED'
+  value     Decimal
+  code      String
+  active    Boolean  @default(true)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  plans     Plan[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
 }
 
 model Subscription {
