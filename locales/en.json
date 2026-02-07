@@ -1,0 +1,49 @@
+{
+  "common": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "payments": "Payments",
+    "routines": "Routines",
+    "settings": "Settings",
+    "logout": "Logout",
+    "profile": "Profile",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "actions": "Actions",
+    "search": "Search"
+  },
+  "auth": {
+    "login": "Login",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "forgotPassword": "Forgot Password?",
+    "passwordChangeRequired": "Password change required",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "changePassword": "Change Password",
+    "sessionExpired": "Authentication timed out, please login again"
+  },
+  "users": {
+    "title": "User Management",
+    "add": "Add User",
+    "role": "Role",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "coach": "Coach",
+    "member": "Member",
+    "admin": "Admin"
+  },
+  "settings": {
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "language": "Language"
+  }
+}
