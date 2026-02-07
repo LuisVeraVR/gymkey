@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export type AlertType = 'success' | 'error' | 'info' | 'warning';
 
@@ -49,34 +50,46 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
     <AlertContext.Provider value={{ showAlert, removeAlert }}>
       {children}
       <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className={`
-              pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[300px] max-w-md animate-slideInRight
-              ${
-                alert.type === 'success' ? 'bg-green-500 text-white' :
-                alert.type === 'error' ? 'bg-red-500 text-white' :
-                alert.type === 'warning' ? 'bg-yellow-500 text-white' :
-                'bg-blue-500 text-white'
-              }
-            `}
-          >
-            <div className="flex-shrink-0">
-              {alert.type === 'success' && <CheckCircle className="w-5 h-5" />}
-              {alert.type === 'error' && <AlertCircle className="w-5 h-5" />}
-              {alert.type === 'warning' && <AlertTriangle className="w-5 h-5" />}
-              {alert.type === 'info' && <Info className="w-5 h-5" />}
-            </div>
-            <p className="text-sm font-medium flex-1">{alert.message}</p>
-            <button
-              onClick={() => removeAlert(alert.id)}
-              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+        <AnimatePresence mode="popLayout">
+          {alerts.map((alert) => (
+            <motion.div
+              key={alert.id}
+              initial={{ opacity: 0, x: 20, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 500,
+                damping: 30,
+                mass: 1
+              }}
+              layout
+              className={`
+                pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[300px] max-w-md backdrop-blur-md border border-white/10
+                ${
+                  alert.type === 'success' ? 'bg-green-500/90 text-white' :
+                  alert.type === 'error' ? 'bg-red-500/90 text-white' :
+                  alert.type === 'warning' ? 'bg-yellow-500/90 text-white' :
+                  'bg-blue-500/90 text-white'
+                }
+              `}
             >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+              <div className="flex-shrink-0">
+                {alert.type === 'success' && <CheckCircle className="w-5 h-5" />}
+                {alert.type === 'error' && <AlertCircle className="w-5 h-5" />}
+                {alert.type === 'warning' && <AlertTriangle className="w-5 h-5" />}
+                {alert.type === 'info' && <Info className="w-5 h-5" />}
+              </div>
+              <p className="text-sm font-medium flex-1">{alert.message}</p>
+              <button
+                onClick={() => removeAlert(alert.id)}
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </AlertContext.Provider>
   );
