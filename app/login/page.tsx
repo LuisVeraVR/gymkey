@@ -532,37 +532,33 @@ export default function LoginPage() {
         {isLoading && step === 'login' && <LoadingScreen />}
       </AnimatePresence>
 
-      {/* Theme & Language Toggles - Fixed Top Right */}
+      {/* Theme & Language Toggles - Fixed Bottom Left */}
       {mounted && (
-        <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md p-1.5 pr-3 rounded-full border border-border/40 shadow-sm">
+        <div className="absolute bottom-6 left-6 z-50 flex items-center gap-3">
+          <div className="flex items-center gap-1">
              {/* Language Toggle */}
             <button
               onClick={() => {
                 const newLang = i18n.language === 'es' ? 'en' : 'es';
                 i18n.changeLanguage(newLang);
               }}
-              className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-xl hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors group relative"
               title={t('settings.language')}
             >
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                <span className="text-xs font-medium uppercase">{i18n.language}</span>
-              </div>
+              <Globe className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
-
-            <div className="w-px h-4 bg-border" />
 
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-xl hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
               title={resolvedTheme === 'dark' ? t('settings.lightMode') : t('settings.darkMode')}
             >
               {resolvedTheme === 'dark' ? (
-                <Sun className="w-4 h-4" />
+                <Sun className="w-5 h-5" />
               ) : (
-                <Moon className="w-4 h-4" />
+                <Moon className="w-5 h-5" />
               )}
             </button>
           </div>
