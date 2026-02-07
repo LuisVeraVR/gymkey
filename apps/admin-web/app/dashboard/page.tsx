@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { useAlert } from '@/components/ui/CustomAlert';
+import { motion } from 'framer-motion';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface DashboardStats {
   totalUsers: number;
@@ -31,24 +34,24 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-6 hover:border-border-hover transition-colors">
+    <div className="bg-card border border-border rounded-lg p-4 hover:border-border-hover transition-colors">
       <div className="flex items-start justify-between">
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-3xl font-bold text-foreground tracking-tight">{value}</p>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">{title}</p>
+          <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
           {change && (
-            <div className={`flex items-center gap-1 text-sm ${
+            <div className={`flex items-center gap-1 text-xs ${
               changeType === 'up' ? 'text-success' : 
               changeType === 'down' ? 'text-destructive' : 
               'text-muted-foreground'
             }`}>
               {changeType === 'up' && (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
                 </svg>
               )}
               {changeType === 'down' && (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-9.2 9.2M7 7v10h10" />
                 </svg>
               )}
@@ -56,7 +59,7 @@ function StatCard({
             </div>
           )}
         </div>
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
           {icon}
         </div>
       </div>
@@ -66,14 +69,14 @@ function StatCard({
 
 function SkeletonCard() {
   return (
-    <div className="bg-card border border-border rounded-xl p-6">
+    <div className="bg-card border border-border rounded-lg p-4">
       <div className="flex items-start justify-between">
-        <div className="space-y-3">
-          <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-          <div className="h-9 w-16 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-3 w-16" />
         </div>
-        <div className="w-12 h-12 rounded-xl bg-muted animate-pulse" />
+        <Skeleton className="w-10 h-10 rounded-lg" />
       </div>
     </div>
   );
@@ -89,13 +92,13 @@ function ActivityItem({
   status: 'granted' | 'denied';
 }) {
   return (
-    <div className="flex items-center gap-4 py-3">
-      <div className={`w-2 h-2 rounded-full ${status === 'granted' ? 'bg-success' : 'bg-destructive'}`} />
+    <div className="flex items-center gap-3 py-2">
+      <div className={`w-1.5 h-1.5 rounded-full ${status === 'granted' ? 'bg-success' : 'bg-destructive'}`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{name}</p>
-        <p className="text-xs text-muted-foreground">{time}</p>
+        <p className="text-xs font-medium text-foreground truncate">{name}</p>
+        <p className="text-[10px] text-muted-foreground">{time}</p>
       </div>
-      <span className={`text-xs font-medium px-2 py-1 rounded ${
+      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
         status === 'granted' 
           ? 'bg-success/10 text-success' 
           : 'bg-destructive/10 text-destructive'
@@ -109,6 +112,7 @@ function ActivityItem({
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -132,6 +136,7 @@ export default function Dashboard() {
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
+        showAlert('error', 'Error al cargar estadísticas');
       } finally {
         setLoading(false);
       }
@@ -149,13 +154,13 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Vista general de tu gimnasio</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="h-9 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <button className="h-8 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
             Filtros
           </button>
-          <button className="h-9 px-4 bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+          <button className="h-8 px-4 bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium rounded-md transition-colors flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>

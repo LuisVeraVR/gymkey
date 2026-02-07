@@ -1,0 +1,49 @@
+{
+  "common": {
+    "dashboard": "Panel Principal",
+    "users": "Usuarios",
+    "payments": "Pagos",
+    "routines": "Rutinas",
+    "settings": "Configuración",
+    "logout": "Cerrar Sesión",
+    "profile": "Perfil",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "confirm": "Confirmar",
+    "actions": "Acciones",
+    "search": "Buscar"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "signIn": "Ingresar",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "passwordChangeRequired": "Cambio de contraseña requerido",
+    "newPassword": "Nueva Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "changePassword": "Cambiar Contraseña",
+    "sessionExpired": "Se acabó el tiempo de autenticación, por favor iniciar sesión de nuevo"
+  },
+  "users": {
+    "title": "Gestión de Usuarios",
+    "add": "Agregar Usuario",
+    "role": "Rol",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "coach": "Entrenador",
+    "member": "Miembro",
+    "admin": "Administrador"
+  },
+  "settings": {
+    "darkMode": "Modo Oscuro",
+    "lightMode": "Modo Claro",
+    "language": "Idioma"
+  }
+}

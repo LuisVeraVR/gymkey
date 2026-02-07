@@ -1,8 +1,13 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { SocketProvider } from "@/context/socket-context";
+import { SettingsProvider } from "@/context/settings-context";
 import MainLayout from "@/components/layout/MainLayout";
 import serverApi from "@/lib/server-api";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { I18nProvider } from "@/components/providers/I18nProvider";
+import { AlertProvider } from "@/components/ui/CustomAlert";
 
 // Using Inter as a proxy for Stack Sans Text since we don't have the proprietary files
 const stackSansText = Inter({
@@ -36,13 +41,23 @@ export default async function RootLayout({
   const user = await getUser();
 
   return (
-    <html lang="es" className="dark">
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${stackSansText.variable} ${stackSansHeadline.variable} font-sans antialiased`}
       >
-        <AuthProvider initialUser={user}>
-          <MainLayout>{children}</MainLayout>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <I18nProvider>
+            <AlertProvider>
+              <AuthProvider initialUser={user}>
+                <SettingsProvider>
+                  <SocketProvider>
+                    <MainLayout>{children}</MainLayout>
+                  </SocketProvider>
+                </SettingsProvider>
+              </AuthProvider>
+            </AlertProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import api from '@/lib/api';
+import { useAlert } from '@/components/ui/CustomAlert';
 
 interface ValidationResult {
   valid: boolean;
@@ -28,16 +29,16 @@ interface AccessLog {
 
 function AccessLogItem({ log }: { log: AccessLog }) {
   return (
-    <div className="flex items-center gap-4 p-4 hover:bg-muted/20 transition-colors rounded-lg">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+    <div className="flex items-center gap-3 p-3 hover:bg-muted/20 transition-colors rounded-lg">
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
         log.status === 'granted' ? 'bg-success/10' : 'bg-destructive/10'
       }`}>
         {log.status === 'granted' ? (
-          <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         ) : (
-          <svg className="w-5 h-5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         )}
@@ -47,14 +48,14 @@ function AccessLogItem({ log }: { log: AccessLog }) {
         <p className="text-xs text-muted-foreground truncate">{log.userEmail}</p>
       </div>
       <div className="text-right">
-        <span className={`text-xs font-medium px-2 py-1 rounded ${
+        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
           log.status === 'granted' 
             ? 'bg-success/10 text-success' 
             : 'bg-destructive/10 text-destructive'
         }`}>
           {log.status === 'granted' ? 'Acceso' : 'Denegado'}
         </span>
-        <p className="text-xs text-muted-foreground mt-1">{log.timestamp}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{log.timestamp}</p>
       </div>
     </div>
   );
@@ -64,7 +65,7 @@ export default function AccessControlPage() {
   const [token, setToken] = useState('');
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { showAlert } = useAlert();
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([
     { id: '1', userName: 'Carlos Rodriguez', userEmail: 'carlos@ejemplo.com', status: 'granted', timestamp: 'Hace 2 min' },
     { id: '2', userName: 'Maria Garcia', userEmail: 'maria@ejemplo.com', status: 'granted', timestamp: 'Hace 5 min' },
@@ -85,7 +86,6 @@ export default function AccessControlPage() {
 
     setLoading(true);
     setResult(null);
-    setError('');
 
     try {
       const { data } = await api.post('/access-keys/validate', { token });
@@ -106,11 +106,11 @@ export default function AccessControlPage() {
       }
     } catch (err: any) {
       console.error(err);
-      if (err.response?.status === 401) {
-        setError(err.response.data.message || 'Error de autorizacion');
-      } else {
-        setError('Error de conexion o token invalido');
-      }
+      const message = err.response?.status === 401 
+        ? (err.response.data.message || 'Error de autorizacion')
+        : 'Error de conexion o token invalido';
+      
+      showAlert('error', message);
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -119,7 +119,6 @@ export default function AccessControlPage() {
 
   const clearResult = () => {
     setResult(null);
-    setError('');
     inputRef.current?.focus();
   };
 
@@ -157,7 +156,7 @@ export default function AccessControlPage() {
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Escanea el codigo QR aqui..."
-                  className="w-full h-9 px-4 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full h-8 px-4 bg-background border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                   autoComplete="off"
                 />
                 {token && (
@@ -176,7 +175,7 @@ export default function AccessControlPage() {
               <button
                 type="submit"
                 disabled={loading || !token.trim()}
-                className="w-full h-9 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-8 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -193,15 +192,6 @@ export default function AccessControlPage() {
                 )}
               </button>
             </form>
-
-            {error && (
-              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3 animate-fadeIn">
-                <svg className="w-5 h-5 text-destructive flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                </svg>
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
           </div>
 
           {/* Result Display */}
@@ -267,7 +257,7 @@ export default function AccessControlPage() {
                     </div>
                     <button
                       onClick={clearResult}
-                      className="h-9 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors"
+                      className="h-8 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors"
                     >
                       Nuevo Escaneo
                     </button>
@@ -320,7 +310,7 @@ export default function AccessControlPage() {
             ))}
           </div>
           <div className="p-4 border-t border-border">
-            <button className="w-full h-9 text-sm text-primary hover:text-primary-hover transition-colors">
+            <button className="w-full h-8 text-sm text-primary hover:text-primary-hover hover:bg-primary/5 rounded-md transition-colors">
               Ver historial completo
             </button>
           </div>

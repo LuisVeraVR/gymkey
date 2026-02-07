@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 type ActionType = 'user_created' | 'user_updated' | 'user_deleted' | 'access_granted' | 'access_denied' | 'payment_received' | 'subscription_created' | 'subscription_expired' | 'settings_changed' | 'login' | 'logout';
 
@@ -218,17 +219,17 @@ function AuditEventCard({ event }: { event: AuditEvent }) {
   const config = actionConfig[event.action];
 
   return (
-    <div className="flex gap-4 p-4 hover:bg-muted/20 transition-colors rounded-lg group">
+    <div className="flex gap-3 p-3 hover:bg-muted/20 transition-colors rounded-lg group">
       {/* Icon */}
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
         {config.icon}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-foreground">
+            <p className="text-xs font-medium text-foreground">
               {config.label}
               {event.target && (
                 <span className="text-muted-foreground font-normal">
@@ -237,16 +238,16 @@ function AuditEventCard({ event }: { event: AuditEvent }) {
               )}
             </p>
             {event.details && (
-              <p className="text-sm text-muted-foreground mt-0.5">{event.details}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{event.details}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1.5">
+            <p className="text-[10px] text-muted-foreground mt-1">
               Por <span className="font-medium text-foreground">{event.actor.name}</span>
               {event.actor.role !== 'SYSTEM' && (
                 <span className="text-muted-foreground"> ({event.actor.email})</span>
               )}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{event.timestamp}</span>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{event.timestamp}</span>
         </div>
       </div>
     </div>
@@ -295,7 +296,7 @@ export default function AuditPage() {
           <h1 className="text-2xl font-bold text-foreground">Auditoria</h1>
           <p className="text-muted-foreground mt-1">Registro de todas las actividades del sistema</p>
         </div>
-        <button className="h-9 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+        <button className="h-8 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -314,30 +315,23 @@ export default function AuditPage() {
             placeholder="Buscar en el log..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-9 pl-10 pr-4 bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            className="w-full h-8 pl-10 pr-4 bg-card border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
           />
         </div>
         
-        <div className="flex gap-2">
-          {[
-            { value: 'all', label: 'Todo' },
-            { value: 'users', label: 'Usuarios' },
-            { value: 'access', label: 'Accesos' },
-            { value: 'payments', label: 'Pagos' },
-            { value: 'system', label: 'Sistema' },
-          ].map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setFilter(option.value as FilterType)}
-              className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors ${
-                filter === option.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary hover:bg-secondary-hover text-secondary-foreground'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="w-full sm:w-[200px]">
+          <CustomSelect
+            value={filter}
+            onChange={(val) => setFilter(val as FilterType)}
+            options={[
+              { value: 'all', label: 'Todo' },
+              { value: 'users', label: 'Usuarios' },
+              { value: 'access', label: 'Accesos' },
+              { value: 'payments', label: 'Pagos' },
+              { value: 'system', label: 'Sistema' },
+            ]}
+            placeholder="Filtrar por tipo"
+          />
         </div>
       </div>
 
@@ -389,7 +383,7 @@ export default function AuditPage() {
       {/* Load More */}
       {filteredEvents.length > 0 && (
         <div className="flex justify-center">
-          <button className="h-9 px-6 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-lg transition-colors">
+          <button className="h-8 px-6 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors">
             Cargar mas eventos
           </button>
         </div>
