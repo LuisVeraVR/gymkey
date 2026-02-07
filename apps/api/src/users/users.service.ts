@@ -39,4 +39,17 @@ export class UsersService {
       data,
     });
   }
+
+  async remove(id: string): Promise<User> {
+    return this.prisma.user.delete({
+      where: { id },
+    });
+  }
+
+  async enablePasswordChange(id: string, enable: boolean): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { mustChangePassword: enable },
+    });
+  }
 }

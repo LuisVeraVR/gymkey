@@ -16,4 +16,8 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   provider?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string; // Optional, for admins creating payments for others
 }

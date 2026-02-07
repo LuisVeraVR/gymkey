@@ -1,13 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class PlansService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsGateway,
+  ) {}
 
   async create(data: Prisma.PlanCreateInput) {
-    return this.prisma.plan.create({ data });
+    const plan = await this.prisma.plan.create({ data });
+    const tenantId = data.tenant?.connect?.id;
+    if (tenantId) {
+      this.notifications.sendToTenant(tenantId, 'plan_created', plan);
+    }
+    return plan;
   }
 
   async findAll(tenantId: string) {
@@ -24,13 +33,21 @@ export class PlansService {
   }
 
   async update(id: string, data: Prisma.PlanUpdateInput) {
-    return this.prisma.plan.update({
+    const plan = await this.prisma.plan.update({
       where: { id },
       data,
     });
+    if (plan.tenantId) {
+      this.notifications.sendToTenant(plan.tenantId, 'plan_updated', plan);
+    }
+    return plan;
   }
 
   async remove(id: string) {
-    return this.prisma.plan.delete({ where: { id } });
+    const plan = await this.prisma.plan.delete({ where: { id } });
+    if (plan.tenantId) {
+      this.notifications.sendToTenant(plan.tenantId, 'plan_deleted', { id });
+    }
+    return plan;
   }
 }

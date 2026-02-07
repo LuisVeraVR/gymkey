@@ -30,7 +30,7 @@ async function main() {
       password,
       role: UserRole.SUPER_ADMIN,
       name: 'Super Admin',
-      tenantId: null, 
+      tenantId: tenant.id, 
     },
     {
       email: 'admin@demogym.com',
