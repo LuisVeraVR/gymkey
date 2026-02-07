@@ -10,11 +10,12 @@ import { useAlert } from '@/components/ui/CustomAlert';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Globe } from 'lucide-react';
+import { Moon, Sun, Globe, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { showAlert } = useAlert();
@@ -287,14 +288,27 @@ export default function LoginPage() {
                     ¿Olvidaste tu contraseña?
                   </button>
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full h-8 px-2 pr-10 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -532,33 +546,33 @@ export default function LoginPage() {
         {isLoading && step === 'login' && <LoadingScreen />}
       </AnimatePresence>
 
-      {/* Theme & Language Toggles - Fixed Bottom Left */}
+      {/* Theme & Language Toggles - Absolute Top Right */}
       {mounted && (
-        <div className="absolute bottom-6 left-6 z-50 flex items-center gap-3">
-          <div className="flex items-center gap-1">
+        <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-background/50 backdrop-blur-sm p-1.5 rounded-full border border-border/20 hover:bg-background/80 hover:border-border/40 transition-all duration-300">
              {/* Language Toggle */}
             <button
               onClick={() => {
                 const newLang = i18n.language === 'es' ? 'en' : 'es';
                 i18n.changeLanguage(newLang);
               }}
-              className="p-2 rounded-xl hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors group relative"
+              className="p-2 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors group relative"
               title={t('settings.language')}
             >
-              <Globe className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Globe className="w-4 h-4" />
+              <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
 
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-xl hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 rounded-full hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
               title={resolvedTheme === 'dark' ? t('settings.lightMode') : t('settings.darkMode')}
             >
               {resolvedTheme === 'dark' ? (
-                <Sun className="w-5 h-5" />
+                <Sun className="w-4 h-4" />
               ) : (
-                <Moon className="w-5 h-5" />
+                <Moon className="w-4 h-4" />
               )}
             </button>
           </div>
