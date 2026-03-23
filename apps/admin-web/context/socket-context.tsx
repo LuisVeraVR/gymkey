@@ -24,20 +24,16 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Only connect if user is logged in
-    if (!user) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-        setIsConnected(false);
-      }
-      return;
-    }
+    if (!user) return;
 
     const token = Cookies.get('token');
     if (!token) return;
 
     // Initialize Socket Connection
-    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000', {
+    // Ensure we connect to the root URL, not /api namespace
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/api\/?$/, '');
+
+    const socketInstance = io(baseUrl, {
       auth: {
         token: token,
       },
@@ -61,10 +57,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Socket connection error:', err.message);
     });
 
-    setSocket(socketInstance);
+    const id = setTimeout(() => setSocket(socketInstance), 0);
 
     return () => {
+      clearTimeout(id);
       socketInstance.disconnect();
+      setTimeout(() => {
+        setSocket(null);
+        setIsConnected(false);
+      }, 0);
     };
   }, [user]);
 

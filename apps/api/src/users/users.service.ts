@@ -29,7 +29,7 @@ export class UsersService {
     return this.prisma.user.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
-      include: { subscription: true }
+      include: { subscription: true },
     });
   }
 

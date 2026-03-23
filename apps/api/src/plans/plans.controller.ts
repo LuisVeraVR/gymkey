@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -7,9 +17,7 @@ import { UserRole, Prisma } from '@prisma/client';
 
 @Controller('plans')
 export class PlansController {
-  constructor(
-    private readonly plansService: PlansService,
-  ) {}
+  constructor(private readonly plansService: PlansService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post()
@@ -40,7 +48,11 @@ export class PlansController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id')
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  async update(@Request() req: any, @Param('id') id: string, @Body() updatePlanDto: any) {
+  async update(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() updatePlanDto: any,
+  ) {
     const { durationDays, ...rest } = updatePlanDto;
     const data: Prisma.PlanUpdateInput = {
       ...rest,

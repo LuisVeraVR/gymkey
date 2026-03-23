@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { UserRole, SubscriptionStatus } from '@prisma/client';
@@ -12,7 +16,7 @@ export class AccessKeysService {
 
   async generateKey(userId: string, tenantId: string) {
     const user: any = await this.usersService.findById(userId);
-    
+
     if (!user) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
@@ -23,34 +27,41 @@ export class AccessKeysService {
 
     // Check subscription for MEMBERS
     if (user.role === UserRole.MEMBER) {
-      if (!user.subscription || user.subscription.status !== SubscriptionStatus.ACTIVE) {
+      if (
+        !user.subscription ||
+        user.subscription.status !== SubscriptionStatus.ACTIVE
+      ) {
         throw new UnauthorizedException('Membresía vencida o inexistente');
       }
     }
 
-    const payload = { 
-      sub: user.id, 
+    const payload = {
+      sub: user.id,
       type: 'access_key',
       tenantId: user.tenantId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     return {
       token: this.jwtService.sign(payload),
-      expiresIn: 30 // seconds suggestion for frontend refresh
+      expiresIn: 30, // seconds suggestion for frontend refresh
     };
   }
 
   async validateKey(token: string, adminTenantId: string) {
     try {
       const payload = await this.jwtService.verifyAsync(token);
-      
+
       if (payload.type !== 'access_key') {
-        throw new BadRequestException('Token inválido: No es una llave de acceso');
+        throw new BadRequestException(
+          'Token inválido: No es una llave de acceso',
+        );
       }
 
       if (payload.tenantId !== adminTenantId) {
-         throw new UnauthorizedException('Este usuario pertenece a otro gimnasio');
+        throw new UnauthorizedException(
+          'Este usuario pertenece a otro gimnasio',
+        );
       }
 
       const user: any = await this.usersService.findById(payload.sub);
@@ -62,24 +73,24 @@ export class AccessKeysService {
         return {
           valid: false,
           reason: 'Usuario INACTIVO o SUSPENDIDO',
-          user: { name: user.name, email: user.email, photo: user.photo }
+          user: { name: user.name, email: user.email, photo: user.photo },
         };
       }
 
       if (user.role === UserRole.MEMBER) {
         if (!user.subscription) {
-           return {
-             valid: false,
-             reason: 'Sin Membresía',
-             user: { name: user.name, email: user.email, photo: user.photo }
-           };
+          return {
+            valid: false,
+            reason: 'Sin Membresía',
+            user: { name: user.name, email: user.email, photo: user.photo },
+          };
         }
         if (user.subscription.status !== SubscriptionStatus.ACTIVE) {
-           return {
-             valid: false,
-             reason: `Membresía ${user.subscription.status}`,
-             user: { name: user.name, email: user.email, photo: user.photo }
-           };
+          return {
+            valid: false,
+            reason: `Membresía ${user.subscription.status}`,
+            user: { name: user.name, email: user.email, photo: user.photo },
+          };
         }
       }
 
@@ -92,15 +103,14 @@ export class AccessKeysService {
           role: user.role,
           photo: user.photo,
           status: user.isActive ? 'ACTIVE' : 'INACTIVE',
-          subscription: user.subscription?.status || 'NONE'
-        }
+          subscription: user.subscription?.status || 'NONE',
+        },
       };
-
     } catch (e) {
       return {
         valid: false,
         reason: 'Token expirado o inválido',
-        error: e.message
+        error: e.message,
       };
     }
   }

@@ -104,10 +104,11 @@ export default function AccessControlPage() {
         };
         setAccessLogs(prev => [newLog, ...prev.slice(0, 9)]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const maybeError = err as { response?: { status?: number; data?: { message?: string } } };
       console.error(err);
-      const message = err.response?.status === 401 
-        ? (err.response.data.message || 'Error de autorizacion')
+      const message = maybeError.response?.status === 401 
+        ? (maybeError.response.data?.message || 'Error de autorizacion')
         : 'Error de conexion o token invalido';
       
       showAlert('error', message);

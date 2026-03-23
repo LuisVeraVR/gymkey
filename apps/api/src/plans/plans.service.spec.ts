@@ -52,15 +52,23 @@ describe('PlansService', () => {
 
   describe('create', () => {
     it('should create a plan', async () => {
-      const dto = { name: 'Test Plan', price: 100, tenant: { connect: { id: 'tenant-1' } } };
+      const dto = {
+        name: 'Test Plan',
+        price: 100,
+        tenant: { connect: { id: 'tenant-1' } },
+      };
       const expectedResult = { id: '1', ...dto };
-      
+
       prisma.plan.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(dto as any);
       expect(result).toEqual(expectedResult);
       expect(prisma.plan.create).toHaveBeenCalledWith({ data: dto });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'plan_created', expectedResult);
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'plan_created',
+        expectedResult,
+      );
     });
   });
 
@@ -68,7 +76,7 @@ describe('PlansService', () => {
     it('should return plans for a specific tenant', async () => {
       const tenantId = 'tenant-1';
       const plans = [{ id: '1', name: 'Plan 1', tenantId }];
-      
+
       prisma.plan.findMany.mockResolvedValue(plans);
 
       const result = await service.findAll(tenantId);
@@ -94,7 +102,11 @@ describe('PlansService', () => {
         where: { id },
         data: dto,
       });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'plan_updated', expectedResult);
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'plan_updated',
+        expectedResult,
+      );
     });
   });
 
@@ -108,7 +120,11 @@ describe('PlansService', () => {
       const result = await service.remove(id);
       expect(result).toEqual(expectedResult);
       expect(prisma.plan.delete).toHaveBeenCalledWith({ where: { id } });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'plan_deleted', { id });
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'plan_deleted',
+        { id },
+      );
     });
   });
 });

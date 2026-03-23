@@ -8,7 +8,7 @@ import { useSocket } from './socket-context';
 interface SettingsConfig {
   currency: string;
   locale: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface Settings {
@@ -35,7 +35,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const fetchSettings = async () => {
     try {
-      const res = await api.get('/settings');
+      const res = await api.get<Settings>('/settings');
       setSettings(res.data);
       // Cache currency for immediate access
       if (res.data?.config?.currency) {
@@ -68,21 +68,24 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleSettingsUpdate = (data: any) => {
+    const handleSettingsUpdate = (data: unknown) => {
+      if (typeof data !== 'object' || data === null) return;
       setSettings((prev) => {
-        if (!prev) return data;
+        const incoming = data as Partial<Settings>;
+        if (!prev) return incoming as Settings;
         return {
           ...prev,
-          ...data,
+          ...incoming,
           config: {
             ...prev.config,
-            ...(data.config || {})
+            ...(incoming.config || {}),
           }
         };
       });
 
-      if (data.config?.currency) {
-        localStorage.setItem('gymkey_currency', data.config.currency);
+      const incoming = data as Partial<Settings>;
+      if (incoming.config?.currency) {
+        localStorage.setItem('gymkey_currency', incoming.config.currency);
       }
     };
 

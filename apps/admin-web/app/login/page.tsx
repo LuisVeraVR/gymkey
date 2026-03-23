@@ -5,7 +5,6 @@ import { useAuth } from '@/context/auth-context';
 import api from '@/lib/api';
 import { QRCodeSVG } from 'qrcode.react';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import Link from 'next/link';
 import { useAlert } from '@/components/ui/CustomAlert';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -19,7 +18,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { showAlert } = useAlert();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
 
@@ -52,41 +51,58 @@ export default function LoginPage() {
       }
   };
 
-  const handleAuthResponse = async (data: any) => {
-      if (data.passwordChangeRequired) {
-          setTempToken(data.tempToken);
+  const handleAuthResponse = async (data: unknown) => {
+      if (typeof data !== 'object' || data === null) {
+          showAlert('error', 'Respuesta inválida del servidor');
+          return;
+      }
+      const payload = data as {
+          passwordChangeRequired?: boolean;
+          mfaRequired?: boolean;
+          mfaSetupRequired?: boolean;
+          mfaSetupSuggested?: boolean;
+          tempToken?: string;
+          user?: Parameters<typeof login>[0];
+      };
+
+      if (payload.passwordChangeRequired) {
+          setTempToken(payload.tempToken || '');
           setDirection(1);
           setStep('password_change');
           return;
       }
       
-      if (data.mfaRequired) {
-          setTempToken(data.tempToken);
+      if (payload.mfaRequired) {
+          setTempToken(payload.tempToken || '');
           setDirection(1);
           setStep('mfa_verify');
           setMfaAttempts(0); // Reset attempts on new MFA requirement
           return;
       }
       
-      if (data.mfaSetupRequired) {
-          setTempToken(data.tempToken);
-          await fetchMfaSecret(data.tempToken);
+      if (payload.mfaSetupRequired) {
+          setTempToken(payload.tempToken || '');
+          if (payload.tempToken) await fetchMfaSecret(payload.tempToken);
           setDirection(1);
           setStep('mfa_setup');
           setCanSkip(false);
           return;
       }
       
-      if (data.mfaSetupSuggested) {
-          setTempToken(data.tempToken);
-          await fetchMfaSecret(data.tempToken);
+      if (payload.mfaSetupSuggested) {
+          setTempToken(payload.tempToken || '');
+          if (payload.tempToken) await fetchMfaSecret(payload.tempToken);
           setDirection(1);
           setStep('mfa_setup');
           setCanSkip(true);
           return;
       }
 
-      login(data.user);
+      if (payload.user) {
+          login(payload.user);
+          return;
+      }
+      showAlert('error', 'No se recibió información de usuario');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -105,13 +121,14 @@ export default function LoginPage() {
       const { data } = authResponse;
       await handleAuthResponse(data);
       setIsLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Ensure we waited the minimum time even on error
       await minLoadTime;
       
+      const maybeError = err as { response?: { status?: number; data?: { message?: string } } };
       console.error(err);
-      if (err.response?.status === 401) {
-        showAlert('error', err.response.data.message || 'Credenciales invalidas');
+      if (maybeError.response?.status === 401) {
+        showAlert('error', maybeError.response.data?.message || 'Credenciales invalidas');
       } else {
         showAlert('error', 'Error al conectar con el servidor');
       }
@@ -134,8 +151,9 @@ export default function LoginPage() {
           });
           await handleAuthResponse(data);
           setIsLoading(false);
-      } catch (err: any) {
-          showAlert('error', err.response?.data?.message || 'Error al cambiar contraseña');
+      } catch (err: unknown) {
+          const maybeError = err as { response?: { data?: { message?: string } } };
+          showAlert('error', maybeError.response?.data?.message || 'Error al cambiar contraseña');
           setIsLoading(false);
       }
   };
@@ -149,10 +167,11 @@ export default function LoginPage() {
               headers: { Authorization: `Bearer ${tempToken}` }
           });
           login(data.user);
-      } catch (err: any) {
+      } catch (err: unknown) {
           setIsLoading(false);
           
-          if (err.response?.status === 401 || err.response?.status === 403) {
+          const maybeError = err as { response?: { status?: number } };
+          if (maybeError.response?.status === 401 || maybeError.response?.status === 403) {
               // Token expired or invalid
               showAlert('error', 'El tiempo para ingresar el código ha expirado, por favor inicie sesión de nuevo');
               setDirection(-1);
@@ -188,8 +207,9 @@ export default function LoginPage() {
               headers: { Authorization: `Bearer ${tempToken}` }
           });
           login(data.user);
-      } catch (err: any) {
-          showAlert('error', err.response?.data?.message || 'Código inválido');
+      } catch (err: unknown) {
+          const maybeError = err as { response?: { data?: { message?: string } } };
+          showAlert('error', maybeError.response?.data?.message || 'Código inválido');
           setIsLoading(false);
       }
   };
@@ -543,7 +563,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex overflow-hidden relative">
       <AnimatePresence>
-        {isLoading && step === 'login' && <LoadingScreen />}
+        {isLoading && <LoadingScreen />}
       </AnimatePresence>
 
       {/* Theme & Language Toggles - Absolute Top Right */}

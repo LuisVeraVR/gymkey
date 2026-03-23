@@ -1,10 +1,23 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 
-const menuGroups = [
+type MenuItem = {
+  name: string;
+  href: string;
+  icon: ReactNode;
+  roles?: string[];
+};
+
+type MenuGroup = {
+  title?: string;
+  items: MenuItem[];
+};
+
+const menuGroups: MenuGroup[] = [
   {
     title: 'Principal',
     items: [
@@ -165,7 +178,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
             
             <div className="space-y-1">
               {group.items.map((item) => {
-                if (item.roles && (!user || !item.roles.includes(user.role as any))) {
+                if (item.roles && (!user || !item.roles.includes(user.role))) {
                   return null;
                 }
                 

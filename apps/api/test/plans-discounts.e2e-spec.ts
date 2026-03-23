@@ -101,7 +101,7 @@ describe('Plans and Discounts (e2e)', () => {
     it('POST /plans should create a plan associated with the tenant', async () => {
       const newPlan = { name: 'New Plan', price: 50, type: 'Mensual' };
       const createdPlan = { id: '2', ...newPlan, tenantId: 'tenant-A' };
-      
+
       mockPrismaService.plan.create.mockResolvedValue(createdPlan);
 
       return request(app.getHttpServer())

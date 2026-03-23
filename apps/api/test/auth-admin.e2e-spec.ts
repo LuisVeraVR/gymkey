@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const request = require('supertest');
 import { AppModule } from './../src/app.module';
 
@@ -29,7 +29,7 @@ describe('Auth System (e2e)', () => {
     expect(response.body).toHaveProperty('access_token');
     expect(response.body).toHaveProperty('user');
     expect(response.body.user.email).toBe('admin@demogym.com');
-    
+
     accessToken = response.body.access_token;
   });
 
@@ -52,14 +52,14 @@ describe('Auth System (e2e)', () => {
         email: 'admin@demogym.com',
         password: '123456',
       });
-    
+
     const token = loginRes.body.access_token;
 
     const response = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-      
+
     expect(response.body.email).toBe('admin@demogym.com');
   });
 });
