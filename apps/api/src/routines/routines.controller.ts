@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { RoutinesService } from './routines.service';
 import { CreateRoutineDto } from './dto/create-routine.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,11 +24,20 @@ export class RoutinesController {
   @Post()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH)
   create(@Request() req: any, @Body() createRoutineDto: CreateRoutineDto) {
-    return this.routinesService.create(createRoutineDto, req.user.id, req.user.tenantId);
+    return this.routinesService.create(
+      createRoutineDto,
+      req.user.id,
+      req.user.tenantId,
+    );
   }
 
   @Get()
-  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH, UserRole.STAFF)
+  @Roles(
+    UserRole.GYM_ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.COACH,
+    UserRole.STAFF,
+  )
   findAll(@Request() req: any) {
     return this.routinesService.findAll(req.user.tenantId);
   }

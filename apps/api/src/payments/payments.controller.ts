@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
@@ -16,11 +26,17 @@ export class PaymentsController {
   @Post()
   create(@Body() createPaymentDto: CreatePaymentDto, @Request() req: any) {
     // If userId is provided and user is admin, use it. Otherwise use current user.
-    const targetUserId = (createPaymentDto.userId && ['GYM_ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) 
-      ? createPaymentDto.userId 
-      : req.user.id;
+    const targetUserId =
+      createPaymentDto.userId &&
+      ['GYM_ADMIN', 'SUPER_ADMIN'].includes(req.user.role)
+        ? createPaymentDto.userId
+        : req.user.id;
 
-    return this.paymentsService.create(createPaymentDto, targetUserId, req.user.tenantId);
+    return this.paymentsService.create(
+      createPaymentDto,
+      targetUserId,
+      req.user.tenantId,
+    );
   }
 
   @Public()
@@ -52,7 +68,12 @@ export class PaymentsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.MEMBER)
+  @Roles(
+    UserRole.GYM_ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.STAFF,
+    UserRole.MEMBER,
+  )
   @Get('my-payments')
   findMyPayments(@Request() req: any) {
     return this.paymentsService.findByUser(req.user.id);

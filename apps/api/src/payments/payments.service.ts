@@ -8,7 +8,11 @@ import { PaymentStatus, SubscriptionStatus } from '@prisma/client';
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createPaymentDto: CreatePaymentDto, userId: string, tenantId: string) {
+  async create(
+    createPaymentDto: CreatePaymentDto,
+    userId: string,
+    tenantId: string,
+  ) {
     const { planId, amount, method, provider } = createPaymentDto;
 
     // 1. Validate Plan
@@ -34,7 +38,7 @@ export class PaymentsService {
     // 3. Process Payment (Simulation)
     // If 'SIMULATED' (app demo) or 'CASH' (immediate approval logic if desired), we auto-approve.
     if (method === 'SIMULATED' || method === 'CARD_TEST') {
-       return this.confirmPayment(payment.id, planId);
+      return this.confirmPayment(payment.id, planId);
     }
 
     return payment;
@@ -91,18 +95,18 @@ export class PaymentsService {
       where: { id: paymentId },
       data: { subscriptionId: sub.id },
     });
-    
+
     // 5. Ensure AccessKey exists
     const existingKey = await this.prisma.accessKey.findUnique({
-        where: { userId: payment.userId }
+      where: { userId: payment.userId },
     });
-    
+
     if (!existingKey) {
-        await this.prisma.accessKey.create({
-            data: {
-                userId: payment.userId
-            }
-        });
+      await this.prisma.accessKey.create({
+        data: {
+          userId: payment.userId,
+        },
+      });
     }
 
     return { payment, subscription: sub };
@@ -129,7 +133,7 @@ export class PaymentsService {
   async refund(id: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
-      include: { subscription: true }
+      include: { subscription: true },
     });
 
     if (!payment) {
@@ -149,10 +153,10 @@ export class PaymentsService {
     // 2. If associated with a subscription, we might want to cancel/suspend it or leave it to manual intervention.
     // For now, let's just log it or optionally suspend the subscription.
     if (payment.subscriptionId) {
-       await this.prisma.subscription.update({
-         where: { id: payment.subscriptionId },
-         data: { status: SubscriptionStatus.CANCELED }
-       });
+      await this.prisma.subscription.update({
+        where: { id: payment.subscriptionId },
+        data: { status: SubscriptionStatus.CANCELED },
+      });
     }
 
     return refundedPayment;

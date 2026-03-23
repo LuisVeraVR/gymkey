@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { SubscriptionStatus } from '@prisma/client';
@@ -12,14 +16,16 @@ export class SubscriptionsService {
 
   async subscribe(userId: string, planId: string) {
     const plan = await this.plansService.findOne(planId);
-    
+
     // Check if user already has an active subscription
     const existing = await this.prisma.subscription.findUnique({
       where: { userId },
     });
 
     if (existing && existing.status === SubscriptionStatus.ACTIVE) {
-      throw new BadRequestException('El usuario ya tiene una suscripción activa');
+      throw new BadRequestException(
+        'El usuario ya tiene una suscripción activa',
+      );
     }
 
     // Calculate end date based on plan duration

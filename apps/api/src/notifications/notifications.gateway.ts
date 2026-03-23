@@ -38,21 +38,29 @@ export class NotificationsGateway
         client.handshake.headers?.authorization?.split(' ')[1];
 
       if (!token) {
-        this.logger.warn(`Client ${client.id} attempting connection without token`);
+        this.logger.warn(
+          `Client ${client.id} attempting connection without token`,
+        );
         client.disconnect();
         return;
       }
 
       const payload = this.jwtService.verify(token);
-      
+
       if (payload.tenantId) {
         await client.join(payload.tenantId);
-        this.logger.log(`Client ${client.id} joined tenant room: ${payload.tenantId}`);
+        this.logger.log(
+          `Client ${client.id} joined tenant room: ${payload.tenantId}`,
+        );
       } else {
-        this.logger.warn(`Client ${client.id} authenticated but has no tenantId`);
+        this.logger.warn(
+          `Client ${client.id} authenticated but has no tenantId`,
+        );
       }
     } catch (e) {
-      this.logger.error(`Connection auth failed for ${client.id}: ${e.message}`);
+      this.logger.error(
+        `Connection auth failed for ${client.id}: ${e.message}`,
+      );
       client.disconnect();
     }
   }

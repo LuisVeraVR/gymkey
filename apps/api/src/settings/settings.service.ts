@@ -24,13 +24,10 @@ export class SettingsService {
 
     // Validate Config Structure if provided
     if (updateSettingsDto.config) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
       const config = updateSettingsDto.config;
       // Basic validation example
       if (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         config.business &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         typeof config.business.gracePeriodDays !== 'number'
       ) {
         // We could throw or just sanitize
@@ -42,7 +39,6 @@ export class SettingsService {
       data.name = updateSettingsDto.name;
     }
     if (updateSettingsDto.config) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data.config = updateSettingsDto.config;
     }
 

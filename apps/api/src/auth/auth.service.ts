@@ -27,15 +27,21 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const tempPayload = { sub: user.id, email: user.email, role: user.role, isTemp: true, tenantId: user.tenantId };
-    
+    const tempPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      isTemp: true,
+      tenantId: user.tenantId,
+    };
+
     // Check Password Change Requirement
     if (user.mustChangePassword) {
-       return {
-         passwordChangeRequired: true,
-         tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
-         user: { id: user.id, email: user.email, role: user.role }
-       };
+      return {
+        passwordChangeRequired: true,
+        tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
+        user: { id: user.id, email: user.email, role: user.role },
+      };
     }
 
     // Check MFA status
@@ -43,7 +49,7 @@ export class AuthService {
       return {
         mfaRequired: true,
         tempToken: this.jwtService.sign(tempPayload, { expiresIn: '5m' }),
-        user: { id: user.id, email: user.email, role: user.role }
+        user: { id: user.id, email: user.email, role: user.role },
       };
     }
 
@@ -52,7 +58,7 @@ export class AuthService {
       return {
         mfaSetupRequired: true,
         tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
-        user: { id: user.id, email: user.email, role: user.role }
+        user: { id: user.id, email: user.email, role: user.role },
       };
     }
 
@@ -60,22 +66,22 @@ export class AuthService {
     return {
       mfaSetupSuggested: true,
       tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
-      user: { id: user.id, email: user.email, role: user.role }
+      user: { id: user.id, email: user.email, role: user.role },
     };
   }
-  
+
   async changePassword(userId: string, newPassword: string) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     // Cast to any because TS might not know about mustChangePassword yet in the update input type
-    await this.usersService.update(userId, { 
+    await this.usersService.update(userId, {
       password: hashedPassword,
-      mustChangePassword: false 
+      mustChangePassword: false,
     } as any);
-    
+
     const user = await this.usersService.findById(userId);
     return this.login(user);
   }
-  
+
   async generateMfaSecret(userId: string) {
     const user = await this.usersService.findById(userId);
     if (!user) {
@@ -104,20 +110,27 @@ export class AuthService {
       console.log('MFA Verification failed: No secret found for user', userId);
       throw new UnauthorizedException('MFA not initialized');
     }
-    
+
     // Check if token is valid with a window of 1 (allows +/- 30 seconds drift)
     // verify returns a Promise<{ valid: boolean }> or similar in this version of otplib
     const result: any = await verify({
       token,
       secret: (user as any).mfaSecret,
-      window: 1, 
+      window: 1,
     } as any);
 
     // Handle both boolean and object return types
     const isValid = typeof result === 'object' ? result?.valid : result;
 
     if (!isValid) {
-      console.log('MFA Verification failed for user', userId, 'Token:', token, 'Secret:', (user as any).mfaSecret);
+      console.log(
+        'MFA Verification failed for user',
+        userId,
+        'Token:',
+        token,
+        'Secret:',
+        (user as any).mfaSecret,
+      );
     }
 
     return isValid;
@@ -132,12 +145,19 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    await this.usersService.update(userId, { mfaSkipCount: ((user as any).mfaSkipCount || 0) + 1 } as any);
+    await this.usersService.update(userId, {
+      mfaSkipCount: ((user as any).mfaSkipCount || 0) + 1,
+    } as any);
   }
-  
+
   // Method to finalize login after MFA verification
   async loginWithMfa(user: any) {
-    const payload = { email: user.email, sub: user.id, role: user.role, tenantId: user.tenantId };
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: user.role,
+      tenantId: user.tenantId,
+    };
     return {
       access_token: this.jwtService.sign(payload),
       user: user,
@@ -150,7 +170,7 @@ export class AuthService {
       // Don't reveal if user exists
       return { message: 'If the email exists, instructions have been sent.' };
     }
-    
+
     // In a real app, generate a reset token and send email
     // For now, we'll just return success
     return { message: 'If the email exists, instructions have been sent.' };

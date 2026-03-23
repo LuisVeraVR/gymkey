@@ -52,18 +52,26 @@ describe('DiscountsService', () => {
 
   describe('create', () => {
     it('should create a discount', async () => {
-      const dto = { name: 'Test Discount', value: 10, tenant: { connect: { id: 'tenant-1' } } };
+      const dto = {
+        name: 'Test Discount',
+        value: 10,
+        tenant: { connect: { id: 'tenant-1' } },
+      };
       const expectedResult = { id: '1', ...dto };
-      
+
       prisma.discount.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(dto as any);
       expect(result).toEqual(expectedResult);
-      expect(prisma.discount.create).toHaveBeenCalledWith({ 
+      expect(prisma.discount.create).toHaveBeenCalledWith({
         data: dto,
-        include: { plans: true }
+        include: { plans: true },
       });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'discount_created', expectedResult);
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'discount_created',
+        expectedResult,
+      );
     });
   });
 
@@ -71,7 +79,7 @@ describe('DiscountsService', () => {
     it('should return discounts for a specific tenant', async () => {
       const tenantId = 'tenant-1';
       const discounts = [{ id: '1', name: 'Discount 1', tenantId }];
-      
+
       prisma.discount.findMany.mockResolvedValue(discounts);
 
       const result = await service.findAll(tenantId);
@@ -79,7 +87,7 @@ describe('DiscountsService', () => {
       expect(prisma.discount.findMany).toHaveBeenCalledWith({
         where: { tenantId },
         include: { plans: true },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
     });
   });
@@ -97,23 +105,35 @@ describe('DiscountsService', () => {
       expect(prisma.discount.update).toHaveBeenCalledWith({
         where: { id },
         data: dto,
-        include: { plans: true }
+        include: { plans: true },
       });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'discount_updated', expectedResult);
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'discount_updated',
+        expectedResult,
+      );
     });
   });
 
   describe('remove', () => {
     it('should delete a discount', async () => {
       const id = '1';
-      const expectedResult = { id, name: 'Deleted Discount', tenantId: 'tenant-1' };
+      const expectedResult = {
+        id,
+        name: 'Deleted Discount',
+        tenantId: 'tenant-1',
+      };
 
       prisma.discount.delete.mockResolvedValue(expectedResult);
 
       const result = await service.remove(id);
       expect(result).toEqual(expectedResult);
       expect(prisma.discount.delete).toHaveBeenCalledWith({ where: { id } });
-      expect(notifications.sendToTenant).toHaveBeenCalledWith('tenant-1', 'discount_deleted', { id });
+      expect(notifications.sendToTenant).toHaveBeenCalledWith(
+        'tenant-1',
+        'discount_deleted',
+        { id },
+      );
     });
   });
 });

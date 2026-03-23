@@ -1,4 +1,14 @@
-import { Controller, Post, Body, UnauthorizedException, BadRequestException, Get, UseGuards, Request, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  BadRequestException,
+  Get,
+  UseGuards,
+  Request,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -17,7 +27,7 @@ export class AuthController {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     const result = await this.authService.login(user);
-    
+
     // Always return the result (which contains tempToken and flags)
     // The frontend must handle the flow (verify, skip, or enable)
     return result;
@@ -31,15 +41,27 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('mfa/enable')
-  async enableMfa(@Request() req: any, @Body() body: { token: string }, @Res({ passthrough: true }) res: Response) {
-    const isValid = await this.authService.verifyMfaToken(req.user.sub, body.token);
+  async enableMfa(
+    @Request() req: any,
+    @Body() body: { token: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const isValid = await this.authService.verifyMfaToken(
+      req.user.sub,
+      body.token,
+    );
     if (!isValid) {
       throw new BadRequestException('Invalid MFA token');
     }
     await this.authService.enableMfa(req.user.sub);
-    
+
     // Issue full token
-    const user = { id: req.user.sub, email: req.user.email, role: req.user.role, tenantId: req.user.tenantId };
+    const user = {
+      id: req.user.sub,
+      email: req.user.email,
+      role: req.user.role,
+      tenantId: req.user.tenantId,
+    };
     const result = await this.authService.loginWithMfa(user);
 
     res.cookie('token', result.access_token, {
@@ -55,13 +77,25 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('mfa/verify-login')
-  async verifyMfaLogin(@Request() req: any, @Body() body: { token: string }, @Res({ passthrough: true }) res: Response) {
-    const isValid = await this.authService.verifyMfaToken(req.user.sub, body.token);
+  async verifyMfaLogin(
+    @Request() req: any,
+    @Body() body: { token: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const isValid = await this.authService.verifyMfaToken(
+      req.user.sub,
+      body.token,
+    );
     if (!isValid) {
       throw new BadRequestException('Invalid MFA token');
     }
 
-    const user = { id: req.user.sub, email: req.user.email, role: req.user.role, tenantId: req.user.tenantId };
+    const user = {
+      id: req.user.sub,
+      email: req.user.email,
+      role: req.user.role,
+      tenantId: req.user.tenantId,
+    };
     const result = await this.authService.loginWithMfa(user);
 
     res.cookie('token', result.access_token, {
@@ -77,12 +111,20 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('mfa/skip')
-  async skipMfa(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+  async skipMfa(
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     await this.authService.skipMfa(req.user.sub);
-    
-    const user = { id: req.user.sub, email: req.user.email, role: req.user.role, tenantId: req.user.tenantId };
+
+    const user = {
+      id: req.user.sub,
+      email: req.user.email,
+      role: req.user.role,
+      tenantId: req.user.tenantId,
+    };
     const result = await this.authService.loginWithMfa(user);
-    
+
     res.cookie('token', result.access_token, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
@@ -95,19 +137,29 @@ export class AuthController {
   }
 
   @Post('admin/login')
-  async adminLogin(@Body() req: any, @Res({ passthrough: true }) res: Response) {
+  async adminLogin(
+    @Body() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const user = await this.authService.validateUser(req.email, req.password);
     if (!user) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    
-    const allowedRoles = [UserRole.SUPER_ADMIN, UserRole.GYM_ADMIN, UserRole.STAFF, UserRole.COACH];
+
+    const allowedRoles = [
+      UserRole.SUPER_ADMIN,
+      UserRole.GYM_ADMIN,
+      UserRole.STAFF,
+      UserRole.COACH,
+    ];
     if (!allowedRoles.includes(user.role)) {
-      throw new UnauthorizedException('No tienes permisos para acceder al panel administrativo');
+      throw new UnauthorizedException(
+        'No tienes permisos para acceder al panel administrativo',
+      );
     }
 
     const result = await this.authService.login(user);
-    
+
     // Admin login also follows the same flow (check for temp token or full token)
     return result;
   }
@@ -131,7 +183,10 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
-  async changePassword(@Request() req: any, @Body() body: { password: string }) {
+  async changePassword(
+    @Request() req: any,
+    @Body() body: { password: string },
+  ) {
     return this.authService.changePassword(req.user.sub, body.password);
   }
 

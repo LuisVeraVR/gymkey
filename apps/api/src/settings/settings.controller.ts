@@ -1,4 +1,11 @@
-import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,8 +29,8 @@ export class SettingsController {
         slug: 'gym-slug',
         config: {
           currency: 'USD',
-          locale: 'en-US'
-        }
+          locale: 'en-US',
+        },
       };
     }
     return settings;
@@ -31,7 +38,13 @@ export class SettingsController {
 
   @Patch()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  updateSettings(@Body() updateSettingsDto: UpdateSettingsDto, @Request() req: any) {
-    return this.settingsService.updateSettings(req.user.tenantId, updateSettingsDto);
+  updateSettings(
+    @Body() updateSettingsDto: UpdateSettingsDto,
+    @Request() req: any,
+  ) {
+    return this.settingsService.updateSettings(
+      req.user.tenantId,
+      updateSettingsDto,
+    );
   }
 }
