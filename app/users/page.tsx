@@ -125,6 +125,14 @@ export default function UsersPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterRole, setFilterRole] = useState<FilterRole>('all');
   
+  type UserFormData = {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    isActive: boolean;
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -182,16 +190,22 @@ export default function UsersPage() {
         await api.post('/users', formData);
         showAlert('success', t('common.success'));
       } else {
-        const updateData: any = { ...formData };
-        if (!updateData.password) delete updateData.password;
+        const updateData: Omit<UserFormData, 'password'> & { password?: string } = {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          isActive: formData.isActive,
+          ...(formData.password ? { password: formData.password } : {}),
+        };
         await api.patch(`/users/${editingUserId}`, updateData);
         showAlert('success', t('common.success'));
       }
       
       setShowModal(false);
       fetchUsers();
-    } catch (e: any) {
-      const msg = e.response?.data?.message || `Error al ${modalMode === 'create' ? 'crear' : 'actualizar'} usuario`;
+    } catch (e: unknown) {
+      const maybeError = e as { response?: { data?: { message?: string } } };
+      const msg = maybeError.response?.data?.message || `Error al ${modalMode === 'create' ? 'crear' : 'actualizar'} usuario`;
       setError(msg);
       showAlert('error', msg);
     } finally {
@@ -238,9 +252,10 @@ export default function UsersPage() {
       await api.delete(`/users/${userId}`);
       setUsers(users.filter(u => u.id !== userId));
       showAlert('success', t('common.success'));
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const maybeError = e as { response?: { data?: { message?: string } } };
       console.error('Error deleting user');
-      showAlert('error', e.response?.data?.message || t('common.error'));
+      showAlert('error', maybeError.response?.data?.message || t('common.error'));
     } finally {
       setActionLoading(null);
     }

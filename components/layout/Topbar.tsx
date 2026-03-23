@@ -1,10 +1,10 @@
 'use client';
 
 import { useAuth } from '@/context/auth-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'react-i18next';
-import { Moon, Sun, Globe, LogOut, User, Settings, Bell, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { Moon, Sun, Globe, LogOut, Settings, Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 // Mock notifications type
@@ -53,11 +53,29 @@ export default function Topbar() {
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   // Prevent hydration mismatch
   useEffect(() => {
-    setMounted(true);
+    const id = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(id);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -126,7 +144,7 @@ export default function Topbar() {
         </button>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors relative"
@@ -139,11 +157,6 @@ export default function Topbar() {
           </button>
 
           {showNotifications && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowNotifications(false)} 
-              />
               <div className="absolute right-0 mt-3 w-80 bg-card/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 animate-fadeIn overflow-hidden">
                 <div className="p-4 border-b border-border/50 flex items-center justify-between bg-muted/30">
                   <div>
@@ -206,7 +219,6 @@ export default function Topbar() {
                   </button>
                 </div>
               </div>
-            </>
           )}
         </div>
 

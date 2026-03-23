@@ -30,6 +30,24 @@ interface Discount {
   plans: { id: string }[]; // API returns plans array
 }
 
+type PlanFormData = {
+  name: string;
+  type: Plan['type'];
+  price: number | string;
+  description: string;
+  active: boolean;
+  features: string[];
+};
+
+type DiscountFormData = {
+  name: string;
+  type: Discount['type'];
+  value: number | string;
+  code: string;
+  active: boolean;
+  applicablePlanIds: string[];
+};
+
 export default function PlansPage() {
   const [activeTab, setActiveTab] = useState<'planes' | 'descuentos'>('planes');
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -44,9 +62,24 @@ export default function PlansPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   
   // Form State
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<PlanFormData | DiscountFormData>({
+    name: '',
+    type: 'Mensual',
+    price: 0,
+    description: '',
+    active: true,
+    features: [''],
+  });
   
   const { socket, isConnected } = useSocket();
+
+  const isPlanFormData = (data: PlanFormData | DiscountFormData): data is PlanFormData => {
+    return 'price' in data;
+  };
+
+  const isDiscountFormData = (data: PlanFormData | DiscountFormData): data is DiscountFormData => {
+    return 'value' in data;
+  };
 
   // WebSocket Event Listeners
   useEffect(() => {
@@ -109,19 +142,32 @@ export default function PlansPage() {
     }
   };
 
-  const handleOpenModal = (type: 'plan' | 'discount', item?: any) => {
+  const handleOpenModal = (type: 'plan' | 'discount', item?: Plan | Discount) => {
     setModalType(type);
     setEditingId(item ? item.id : null);
     
     if (item) {
       // Editing
       if (type === 'discount') {
+          const discount = item as Discount;
           setFormData({
-              ...item,
-              applicablePlanIds: item.plans ? item.plans.map((p: any) => p.id) : []
+              name: discount.name,
+              type: discount.type,
+              value: discount.value,
+              code: discount.code,
+              active: discount.active,
+              applicablePlanIds: discount.plans ? discount.plans.map((p) => p.id) : []
           });
       } else {
-          setFormData({ ...item });
+          const plan = item as Plan;
+          setFormData({
+            name: plan.name,
+            type: plan.type,
+            price: plan.price,
+            description: plan.description,
+            active: plan.active,
+            features: plan.features,
+          });
       }
     } else {
       // Creating
@@ -151,10 +197,11 @@ export default function PlansPage() {
   const handleSave = async () => {
     try {
         if (modalType === 'plan') {
+            if (!isPlanFormData(formData)) return;
             const planData = {
                 name: formData.name,
                 type: formData.type,
-                price: parseFloat(formData.price),
+                price: parseFloat(String(formData.price)),
                 description: formData.description,
                 active: formData.active,
                 features: formData.features.filter((f: string) => f.trim() !== ''),
@@ -169,10 +216,11 @@ export default function PlansPage() {
                 showAlert('success', 'Plan creado correctamente');
             }
         } else {
+            if (!isDiscountFormData(formData)) return;
             const discountData = {
                 name: formData.name,
                 type: formData.type,
-                value: parseFloat(formData.value),
+                value: parseFloat(String(formData.value)),
                 code: formData.code,
                 active: formData.active,
                 applicablePlanIds: formData.applicablePlanIds
@@ -212,21 +260,25 @@ export default function PlansPage() {
   };
 
   const handleFeatureChange = (index: number, value: string) => {
+    if (!isPlanFormData(formData)) return;
     const newFeatures = [...formData.features];
     newFeatures[index] = value;
     setFormData({ ...formData, features: newFeatures });
   };
 
   const addFeature = () => {
+    if (!isPlanFormData(formData)) return;
     setFormData({ ...formData, features: [...formData.features, ''] });
   };
 
   const removeFeature = (index: number) => {
-    const newFeatures = formData.features.filter((_: any, i: number) => i !== index);
+    if (!isPlanFormData(formData)) return;
+    const newFeatures = formData.features.filter((_, i: number) => i !== index);
     setFormData({ ...formData, features: newFeatures });
   };
 
   const toggleApplicablePlan = (planId: string) => {
+    if (!isDiscountFormData(formData)) return;
     const currentIds = formData.applicablePlanIds || [];
     if (currentIds.includes(planId)) {
       setFormData({ ...formData, applicablePlanIds: currentIds.filter((id: string) => id !== planId) });
@@ -235,19 +287,37 @@ export default function PlansPage() {
     }
   };
 
+  const updatePlanForm = (patch: Partial<PlanFormData>) => {
+    setFormData((prev) => (isPlanFormData(prev) ? { ...prev, ...patch } : prev));
+  };
+
+  const updateDiscountForm = (patch: Partial<DiscountFormData>) => {
+    setFormData((prev) => (isDiscountFormData(prev) ? { ...prev, ...patch } : prev));
+  };
+
+  const planTypeValue: Plan['type'] = isPlanFormData(formData) ? formData.type : 'Mensual';
+  const planPriceValue: PlanFormData['price'] = isPlanFormData(formData) ? formData.price : 0;
+  const planDescriptionValue: PlanFormData['description'] = isPlanFormData(formData) ? formData.description : '';
+  const planFeaturesValue: PlanFormData['features'] = isPlanFormData(formData) ? formData.features : [];
+
+  const discountTypeValue: Discount['type'] = isDiscountFormData(formData) ? formData.type : 'Porcentaje';
+  const discountValueValue: DiscountFormData['value'] = isDiscountFormData(formData) ? formData.value : 0;
+  const discountCodeValue: DiscountFormData['code'] = isDiscountFormData(formData) ? formData.code : '';
+  const discountApplicablePlanIds: DiscountFormData['applicablePlanIds'] = isDiscountFormData(formData) ? formData.applicablePlanIds : [];
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Gestión de Planes y Descuentos</h1>
-          <p className="text-muted-foreground mt-1">Administra las suscripciones, precios y promociones de tu gimnasio.</p>
+          <h1 className="text-xl font-bold text-foreground tracking-tight">Gestión de Planes y Descuentos</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Administra las suscripciones, precios y promociones de tu gimnasio.</p>
         </div>
         <button 
           onClick={() => handleOpenModal(activeTab === 'planes' ? 'plan' : 'discount')}
-          className="px-5 py-2.5 bg-primary text-primary-foreground font-medium rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+          className="h-8 px-3 bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-medium rounded-md transition-colors flex items-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           {activeTab === 'planes' ? 'Nuevo Plan' : 'Nuevo Descuento'}
@@ -255,10 +325,10 @@ export default function PlansPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl w-fit">
+      <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('planes')}
-          className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`h-7 px-4 rounded-md text-xs font-medium transition-all duration-200 ${
             activeTab === 'planes'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -268,7 +338,7 @@ export default function PlansPage() {
         </button>
         <button
           onClick={() => setActiveTab('descuentos')}
-          className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`h-7 px-4 rounded-md text-xs font-medium transition-all duration-200 ${
             activeTab === 'descuentos'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -481,7 +551,7 @@ export default function PlansPage() {
                     <label className="text-sm font-medium text-foreground">Nombre del Plan</label>
                     <input 
                       type="text" 
-                      className="w-full p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      className="w-full h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Ej. Plan Mensual VIP"
@@ -497,21 +567,21 @@ export default function PlansPage() {
                           { value: 'Anual', label: 'Anual' },
                           { value: 'Especial', label: 'Especial' }
                         ]}
-                        value={formData.type}
-                        onChange={(val) => setFormData({ ...formData, type: val })}
+                        value={planTypeValue}
+                        onChange={(val) => updatePlanForm({ type: val as PlanFormData['type'] })}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Precio</label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2 text-muted-foreground">
+                        <span className="absolute left-3 top-2 text-muted-foreground text-xs">
                             {currency === 'COP' ? '$' : currency === 'EUR' ? '€' : '$'}
                         </span>
                         <input 
                           type="number" 
-                          className="w-full p-2 pl-7 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          className="w-full h-8 pl-7 pr-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                          value={planPriceValue}
+                          onChange={(e) => updatePlanForm({ price: e.target.value })}
                           placeholder="0.00"
                         />
                       </div>
@@ -521,29 +591,29 @@ export default function PlansPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Descripción</label>
                     <textarea 
-                      className="w-full p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all min-h-[80px]"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full p-2.5 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all min-h-[80px] text-sm resize-none"
+                      value={planDescriptionValue}
+                      onChange={(e) => updatePlanForm({ description: e.target.value })}
                       placeholder="Breve descripción del plan..."
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Características</label>
-                    {formData.features.map((feature: string, idx: number) => (
+                    {planFeaturesValue.map((feature: string, idx: number) => (
                       <div key={idx} className="flex gap-2">
                         <input 
                           type="text" 
-                          className="flex-1 p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                          className="flex-1 h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                           value={feature}
                           onChange={(e) => handleFeatureChange(idx, e.target.value)}
                           placeholder="Ej. Acceso a sauna"
                         />
                         <button 
                           onClick={() => removeFeature(idx)}
-                          className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                          className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
                         >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
@@ -551,7 +621,7 @@ export default function PlansPage() {
                     ))}
                     <button 
                       onClick={addFeature}
-                      className="text-sm text-primary hover:underline font-medium flex items-center gap-1"
+                      className="text-xs text-primary hover:underline font-medium flex items-center gap-1 mt-1"
                     >
                       + Agregar característica
                     </button>
@@ -563,7 +633,7 @@ export default function PlansPage() {
                     <label className="text-sm font-medium text-foreground">Nombre del Descuento</label>
                     <input 
                       type="text" 
-                      className="w-full p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      className="w-full h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Ej. Descuento Verano"
@@ -578,17 +648,17 @@ export default function PlansPage() {
                           { value: 'Porcentaje', label: 'Porcentaje' },
                           { value: 'Monto Fijo', label: 'Monto Fijo' }
                         ]}
-                        value={formData.type}
-                        onChange={(val) => setFormData({ ...formData, type: val })}
+                        value={discountTypeValue}
+                        onChange={(val) => updateDiscountForm({ type: val as DiscountFormData['type'] })}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Valor</label>
                       <input 
                         type="number" 
-                        className="w-full p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                        value={formData.value}
-                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                        className="w-full h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                        value={discountValueValue}
+                        onChange={(e) => updateDiscountForm({ value: e.target.value })}
                         placeholder="0"
                       />
                     </div>
@@ -598,9 +668,9 @@ export default function PlansPage() {
                     <label className="text-sm font-medium text-foreground">Código Promocional</label>
                     <input 
                       type="text" 
-                      className="w-full p-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all uppercase"
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                      className="w-full h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all uppercase text-sm"
+                      value={discountCodeValue}
+                      onChange={(e) => updateDiscountForm({ code: e.target.value.toUpperCase() })}
                       placeholder="Ej. VERANO2026"
                     />
                   </div>
@@ -614,7 +684,7 @@ export default function PlansPage() {
                                 <input 
                                     type="checkbox" 
                                     className="rounded border-gray-300 text-primary focus:ring-primary"
-                                    checked={(formData.applicablePlanIds || []).includes(plan.id)}
+                                    checked={discountApplicablePlanIds.includes(plan.id)}
                                     onChange={() => toggleApplicablePlan(plan.id)}
                                 />
                                 <span className="text-sm text-foreground">{plan.name}</span>
@@ -642,13 +712,13 @@ export default function PlansPage() {
             <div className="p-6 border-t border-border bg-muted/30 flex justify-end gap-3">
               <button 
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-lg transition-colors"
+                className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleSave}
-                className="px-6 py-2 text-sm font-bold text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                className="h-8 px-3 text-xs font-bold text-primary-foreground bg-primary rounded-md hover:bg-primary/90 shadow-sm transition-all"
               >
                 Guardar
               </button>

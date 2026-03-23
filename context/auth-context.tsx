@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 import api from '@/lib/api';
@@ -37,6 +37,25 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
   const { showAlert } = useAlert();
   const { t } = useTranslation();
 
+  const login = useCallback((userData: User) => {
+    setUser(userData);
+    router.push('/dashboard');
+  }, [router]);
+
+  const logout = useCallback(async () => {
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+    setUser(null);
+    router.push('/login');
+    setLoading(false);
+  }, [router]);
+
   // Setup Axios Interceptor for 401s
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
@@ -57,7 +76,7 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
     return () => {
       api.interceptors.response.eject(interceptor);
     };
-  }, [user, router, showAlert, t]);
+  }, [user, showAlert, t, logout]);
 
   // Proactive Token Expiration Check
   useEffect(() => {
@@ -102,7 +121,7 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
     return () => {
       if (typeof cleanup === 'function') cleanup();
     };
-  }, [user]); // Re-run when user changes (login/logout)
+  }, [user, showAlert, t, logout]); // Re-run when user changes (login/logout)
 
   useEffect(() => {
     const publicRoutes = ['/login', '/forgot-password'];
@@ -113,22 +132,6 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
       router.push('/login');
     }
   }, [user, loading, pathname, router]);
-
-  const login = (userData: User) => {
-    // Cookie is set by server
-    setUser(userData);
-    router.push('/dashboard');
-  };
-
-  const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (e) {
-      console.error('Logout failed', e);
-    }
-    setUser(null);
-    router.push('/login');
-  };
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
