@@ -64,6 +64,17 @@ export class SubscriptionsService {
     });
   }
 
+  findAllByTenant(tenantId: string | null) {
+    if (!tenantId) {
+      return [];
+    }
+    return this.prisma.subscription.findMany({
+      where: { user: { tenantId } },
+      include: { user: { select: { id: true, name: true, email: true } }, plan: true },
+      orderBy: { endDate: 'desc' },
+    });
+  }
+
   async cancel(userId: string) {
     return this.prisma.subscription.update({
       where: { userId },

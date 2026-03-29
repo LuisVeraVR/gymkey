@@ -150,17 +150,28 @@ export class AuthService {
     } as any);
   }
 
-  // Method to finalize login after MFA verification
-  async loginWithMfa(user: any) {
+  async loginWithMfa(user: { id: string; email?: string; role?: string; tenantId?: string | null }) {
+    const full = await this.usersService.findById(user.id);
+    if (!full) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+    const displayName = full.name?.trim() || full.email;
     const payload = {
-      email: user.email,
-      sub: user.id,
-      role: user.role,
-      tenantId: user.tenantId,
+      email: full.email,
+      sub: full.id,
+      role: full.role,
+      tenantId: full.tenantId,
+      name: displayName,
     };
     return {
       access_token: this.jwtService.sign(payload),
-      user: user,
+      user: {
+        id: full.id,
+        email: full.email,
+        role: full.role,
+        tenantId: full.tenantId,
+        name: displayName,
+      },
     };
   }
 

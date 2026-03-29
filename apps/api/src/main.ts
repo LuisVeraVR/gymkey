@@ -8,9 +8,21 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  const defaultCors = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8081',
+    'http://127.0.0.1:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:19006',
+  ];
+  const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+    : defaultCors;
+
   app.enableCors({
-    origin: 'http://localhost:3000', // Frontend URL
-    credentials: true, // Allow cookies
+    origin: corsOrigins,
+    credentials: true,
   });
 
   const config = new DocumentBuilder()
@@ -22,7 +34,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  await app.listen(process.env.PORT || 3000);
+  await app.listen(process.env.PORT || 3001);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

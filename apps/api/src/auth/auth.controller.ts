@@ -12,13 +12,22 @@ import {
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './roles.guard';
-import { Roles } from './roles.decorator';
 import { UserRole } from '@prisma/client';
+import { UsersService } from '../users/users.service';
+
+const authTokenCookie = {
+  httpOnly: false,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   @Post('login')
   async login(@Body() req: any, @Res({ passthrough: true }) res: Response) {
@@ -65,14 +74,15 @@ export class AuthController {
     const result = await this.authService.loginWithMfa(user);
 
     res.cookie('token', result.access_token, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      ...authTokenCookie,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return { success: true, user: result.user };
+    return {
+      success: true,
+      user: result.user,
+      access_token: result.access_token,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -99,14 +109,11 @@ export class AuthController {
     const result = await this.authService.loginWithMfa(user);
 
     res.cookie('token', result.access_token, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      ...authTokenCookie,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return { user: result.user };
+    return { user: result.user, access_token: result.access_token };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -126,14 +133,11 @@ export class AuthController {
     const result = await this.authService.loginWithMfa(user);
 
     res.cookie('token', result.access_token, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      ...authTokenCookie,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return { user: result.user };
+    return { user: result.user, access_token: result.access_token };
   }
 
   @Post('admin/login')
@@ -172,10 +176,7 @@ export class AuthController {
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
     res.cookie('token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
+      ...authTokenCookie,
       maxAge: 0,
     });
     return { message: 'Logged out successfully' };
@@ -192,7 +193,13 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Request() req: any) {
-    return req.user;
+  async getProfile(@Request() req: { user: { sub: string } }) {
+    const user = await this.usersService.findById(req.user.sub);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const { password, mfaSecret, ...rest } = user;
+    const displayName = rest.name?.trim() || rest.email;
+    return { ...rest, name: displayName };
   }
 }

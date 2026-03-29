@@ -13,6 +13,8 @@ import { RoutinesModule } from './routines/routines.module';
 import { SettingsModule } from './settings/settings.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     SettingsModule,
     DiscountsModule,
     NotificationsModule,
+    DashboardModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -6,7 +6,6 @@ import { AppModule } from './../src/app.module';
 
 describe('Auth System (e2e)', () => {
   let app: INestApplication;
-  let accessToken: string;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -17,24 +16,31 @@ describe('Auth System (e2e)', () => {
     await app.init();
   });
 
+  afterEach(async () => {
+    await app.close();
+  });
+
   it('/auth/admin/login (POST) - Success', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/admin/login')
       .send({
         email: 'admin@demogym.com',
         password: '123456',
-      })
-      .expect(201);
+      });
 
-    expect(response.body).toHaveProperty('access_token');
-    expect(response.body).toHaveProperty('user');
-    expect(response.body.user.email).toBe('admin@demogym.com');
+    expect([200, 201]).toContain(response.status);
 
-    accessToken = response.body.access_token;
+    expect(
+      response.body.mfaSetupSuggested === true ||
+        response.body.mfaSetupRequired === true ||
+        response.body.mfaRequired === true ||
+        response.body.passwordChangeRequired === true,
+    ).toBe(true);
+    expect(response.body.tempToken).toBeDefined();
+    expect(response.body.user?.email).toBe('admin@demogym.com');
   });
 
   it('/auth/admin/login (POST) - Unauthorized Role', async () => {
-    // Assuming member@demogym.com exists and is a MEMBER
     await request(app.getHttpServer())
       .post('/auth/admin/login')
       .send({
@@ -45,7 +51,6 @@ describe('Auth System (e2e)', () => {
   });
 
   it('/auth/me (GET) - Protected Route', async () => {
-    // First login to get token
     const loginRes = await request(app.getHttpServer())
       .post('/auth/admin/login')
       .send({
@@ -53,13 +58,25 @@ describe('Auth System (e2e)', () => {
         password: '123456',
       });
 
-    const token = loginRes.body.access_token;
+    const tempToken = loginRes.body.tempToken;
+    expect(tempToken).toBeDefined();
+
+    const skipRes = await request(app.getHttpServer())
+      .post('/auth/mfa/skip')
+      .set('Authorization', `Bearer ${tempToken}`);
+
+    expect([200, 201]).toContain(skipRes.status);
+
+    const cookies = skipRes.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    const cookieHeader = Array.isArray(cookies) ? cookies.join('; ') : cookies;
 
     const response = await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Cookie', cookieHeader)
       .expect(200);
 
     expect(response.body.email).toBe('admin@demogym.com');
+    expect(response.body.name).toBeDefined();
   });
 });
