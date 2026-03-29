@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SettingsService } from './settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 describe('SettingsService', () => {
   let service: SettingsService;
@@ -19,12 +20,17 @@ describe('SettingsService', () => {
     sendToTenant: jest.fn(),
   };
 
+  const mockAuditLogsService = {
+    append: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SettingsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: NotificationsGateway, useValue: mockNotificationsGateway },
+        { provide: AuditLogsService, useValue: mockAuditLogsService },
       ],
     }).compile();
 
@@ -52,9 +58,13 @@ describe('SettingsService', () => {
         slug: 'slug',
       };
 
+      mockPrismaService.tenant.findUnique.mockResolvedValue({
+        name: 'Old',
+        config: { currency: 'EUR' },
+      });
       mockPrismaService.tenant.update.mockResolvedValue(updatedTenant);
 
-      const result = await service.updateSettings(tenantId, dto);
+      const result = await service.updateSettings(tenantId, dto, 'user-1');
 
       expect(prisma.tenant.update).toHaveBeenCalledWith({
         where: { id: tenantId },

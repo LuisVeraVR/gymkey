@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { cookies } from 'next/headers';
+import { getApiBaseUrl } from './api-base';
 
 const serverApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api',
+  baseURL: getApiBaseUrl(),
 });
 
 serverApi.interceptors.request.use(async (config) => {

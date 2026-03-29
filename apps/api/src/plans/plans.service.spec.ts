@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PlansService } from './plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const mockPrismaService = {
   plan: {
@@ -15,6 +16,10 @@ const mockPrismaService = {
 
 const mockNotificationsGateway = {
   sendToTenant: jest.fn(),
+};
+
+const mockAuditLogsService = {
+  append: jest.fn(),
 };
 
 describe('PlansService', () => {
@@ -33,6 +38,10 @@ describe('PlansService', () => {
         {
           provide: NotificationsGateway,
           useValue: mockNotificationsGateway,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
         },
       ],
     }).compile();

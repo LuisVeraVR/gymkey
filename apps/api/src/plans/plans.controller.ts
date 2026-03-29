@@ -29,7 +29,7 @@ export class PlansController {
       duration: durationDays || rest.duration || 30,
       tenant: { connect: { id: req.user.tenantId } },
     };
-    return this.plansService.create(data);
+    return this.plansService.create(data, req.user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -42,7 +42,7 @@ export class PlansController {
   @Delete(':id')
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
   async remove(@Request() req: any, @Param('id') id: string) {
-    return this.plansService.remove(id);
+    return this.plansService.remove(id, req.user.sub);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,6 +60,6 @@ export class PlansController {
     if (durationDays !== undefined) {
       data.duration = durationDays;
     }
-    return this.plansService.update(id, data);
+    return this.plansService.update(id, data, req.user.sub);
   }
 }

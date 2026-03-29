@@ -36,7 +36,7 @@ export class DiscountsController {
         : undefined,
     };
 
-    return this.discountsService.create(data);
+    return this.discountsService.create(data, req.user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -65,13 +65,13 @@ export class DiscountsController {
       };
     }
 
-    return this.discountsService.update(id, data);
+    return this.discountsService.update(id, data, req.user.sub);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Delete(':id')
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
   async remove(@Request() req: any, @Param('id') id: string) {
-    return this.discountsService.remove(id);
+    return this.discountsService.remove(id, req.user.sub);
   }
 }

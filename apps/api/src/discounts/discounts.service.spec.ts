@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DiscountsService } from './discounts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const mockPrismaService = {
   discount: {
@@ -15,6 +16,10 @@ const mockPrismaService = {
 
 const mockNotificationsGateway = {
   sendToTenant: jest.fn(),
+};
+
+const mockAuditLogsService = {
+  append: jest.fn(),
 };
 
 describe('DiscountsService', () => {
@@ -33,6 +38,10 @@ describe('DiscountsService', () => {
         {
           provide: NotificationsGateway,
           useValue: mockNotificationsGateway,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
         },
       ],
     }).compile();
@@ -57,7 +66,7 @@ describe('DiscountsService', () => {
         value: 10,
         tenant: { connect: { id: 'tenant-1' } },
       };
-      const expectedResult = { id: '1', ...dto };
+      const expectedResult = { id: '1', code: 'SAVE10', ...dto };
 
       prisma.discount.create.mockResolvedValue(expectedResult);
 
@@ -96,7 +105,12 @@ describe('DiscountsService', () => {
     it('should update a discount', async () => {
       const id = '1';
       const dto = { name: 'Updated Discount' };
-      const expectedResult = { id, ...dto, tenantId: 'tenant-1' };
+      const expectedResult = {
+        id,
+        code: 'SAVE10',
+        ...dto,
+        tenantId: 'tenant-1',
+      };
 
       prisma.discount.update.mockResolvedValue(expectedResult);
 
@@ -121,6 +135,7 @@ describe('DiscountsService', () => {
       const expectedResult = {
         id,
         name: 'Deleted Discount',
+        code: 'DEL',
         tenantId: 'tenant-1',
       };
 

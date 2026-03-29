@@ -20,6 +20,7 @@ export class AccessKeysController {
 
   // Endpoint for Mobile App to get the QR Token
   @Get('my-key')
+  @UseGuards(RolesGuard)
   @Roles(
     UserRole.MEMBER,
     UserRole.COACH,

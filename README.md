@@ -29,19 +29,28 @@ Plataforma de gestión para gimnasios (SaaS) con arquitectura Monorepo.
 
 3. **Configurar Entorno y DB:**
    ```bash
+   cp apps/api/.env.example apps/api/.env
+   # Edita apps/api/.env (DATABASE_URL, JWT_SECRET, etc.)
+
    cd apps/api
    npx prisma migrate dev --name init
    npx ts-node prisma/seed.ts
    ```
 
-4. **Levantar Servicios:**
+4. **Variables del panel admin (opcional pero recomendado):**
+   ```bash
+   cp apps/admin-web/.env.example apps/admin-web/.env.local
+   ```
+   Por defecto el admin usa `NEXT_PUBLIC_API_URL=http://localhost:3001/api`. La API escucha en el puerto **3001** y el admin en **3000** para evitar conflictos.
 
-   *Terminal 1 (Backend):*
+5. **Levantar Servicios:**
+
+   *Terminal 1 (Backend, puerto 3001 por defecto):*
    ```bash
    pnpm --filter api start:dev
    ```
 
-   *Terminal 2 (Admin Web):*
+   *Terminal 2 (Admin Web, puerto 3000):*
    ```bash
    pnpm --filter admin-web dev
    ```

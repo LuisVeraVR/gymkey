@@ -40,11 +40,12 @@ export class SettingsController {
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
   updateSettings(
     @Body() updateSettingsDto: UpdateSettingsDto,
-    @Request() req: any,
+    @Request() req: { user: { tenantId: string; sub: string } },
   ) {
     return this.settingsService.updateSettings(
       req.user.tenantId,
       updateSettingsDto,
+      req.user.sub,
     );
   }
 }

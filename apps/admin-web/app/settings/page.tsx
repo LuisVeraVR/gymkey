@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { useAuth } from '@/context/auth-context';
+import { useSettings } from '@/context/settings-context';
 import { useAlert } from '@/components/ui/CustomAlert';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -66,7 +69,12 @@ const TABS = [
   { id: 'security', label: 'Seguridad', icon: Shield },
 ];
 
+const ADMIN_SETTINGS_ROLES = ['SUPER_ADMIN', 'GYM_ADMIN'] as const;
+
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user: authUser } = useAuth();
+  const { refreshSettings } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,14 +82,19 @@ export default function SettingsPage() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
+    if (!authUser) return;
+    if (!ADMIN_SETTINGS_ROLES.includes(authUser.role as (typeof ADMIN_SETTINGS_ROLES)[number])) {
+      router.replace('/dashboard');
+      return;
+    }
+
     const fetchSettings = async () => {
       try {
         const res = await api.get('/settings');
-        // Ensure social object exists
         const data = res.data;
         if (!data.config.social) data.config.social = {};
         setSettings(data);
-        
+
         if (data?.config?.currency) {
           localStorage.setItem('gymkey_currency', data.config.currency);
         }
@@ -94,7 +107,14 @@ export default function SettingsPage() {
     };
 
     fetchSettings();
-  }, [showAlert]);
+  }, [authUser, router, showAlert]);
+
+  if (
+    authUser &&
+    !ADMIN_SETTINGS_ROLES.includes(authUser.role as (typeof ADMIN_SETTINGS_ROLES)[number])
+  ) {
+    return null;
+  }
 
   const handleConfigChange = (key: string, value: string | number | boolean) => {
     if (!settings) return;
@@ -134,7 +154,9 @@ export default function SettingsPage() {
       if (settings.config.currency) {
         localStorage.setItem('gymkey_currency', settings.config.currency);
       }
-      
+
+      await refreshSettings();
+
       showAlert('success', 'Configuración guardada exitosamente');
     } catch (e) {
       console.error(e);
