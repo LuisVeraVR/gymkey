@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 import { useAuth } from './auth-context';
+import { getSocketOrigin } from '@/lib/api-base';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -29,11 +30,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     const token = Cookies.get('token');
     if (!token) return;
 
-    // Initialize Socket Connection
-    // Ensure we connect to the root URL, not /api namespace
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/api\/?$/, '');
-
-    const socketInstance = io(baseUrl, {
+    const socketInstance = io(getSocketOrigin(), {
       auth: {
         token: token,
       },

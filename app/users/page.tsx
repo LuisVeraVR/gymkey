@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { useAuth } from '@/context/auth-context';
 import { useTranslation } from 'react-i18next';
 import { useAlert } from '@/components/ui/CustomAlert';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -112,7 +114,11 @@ function EmptyState() {
   );
 }
 
+const ADMIN_USER_ROLES = ['SUPER_ADMIN', 'GYM_ADMIN'] as const;
+
 export default function UsersPage() {
+  const router = useRouter();
+  const { user: authUser } = useAuth();
   const { t } = useTranslation();
   const { showAlert } = useAlert();
   const [users, setUsers] = useState<User[]>([]);
@@ -156,8 +162,20 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
+    if (!authUser) return;
+    if (!ADMIN_USER_ROLES.includes(authUser.role as (typeof ADMIN_USER_ROLES)[number])) {
+      router.replace('/dashboard');
+      return;
+    }
     fetchUsers();
-  }, []);
+  }, [authUser, router]); // eslint-disable-line react-hooks/exhaustive-deps -- fetch al obtener usuario con rol válido
+
+  if (
+    authUser &&
+    !ADMIN_USER_ROLES.includes(authUser.role as (typeof ADMIN_USER_ROLES)[number])
+  ) {
+    return null;
+  }
 
   const openCreateModal = () => {
     setModalMode('create');

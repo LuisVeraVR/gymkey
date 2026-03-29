@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useAlert } from '@/components/ui/CustomAlert';
-import { motion } from 'framer-motion';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 interface DashboardStats {
@@ -12,6 +11,7 @@ interface DashboardStats {
   accessesToday: number;
   expiredMemberships: number;
   monthlyRevenue: number;
+  /** ISO timestamps from API; shown relative after fetch */
   recentAccess: Array<{
     id: string;
     userName: string;
@@ -115,24 +115,30 @@ export default function Dashboard() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
+    const formatRelativeTime = (iso: string) => {
+      const d = new Date(iso);
+      const diffMs = Date.now() - d.getTime();
+      if (diffMs < 0) return 'Ahora';
+      const sec = Math.floor(diffMs / 1000);
+      if (sec < 60) return 'Hace un momento';
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `Hace ${min} min`;
+      const h = Math.floor(min / 60);
+      if (h < 24) return `Hace ${h} h`;
+      const days = Math.floor(h / 24);
+      if (days < 7) return `Hace ${days} d`;
+      return d.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
+    };
+
     const fetchStats = async () => {
       try {
-        // Simulated data - replace with actual API call
-        // const { data } = await api.get('/dashboard/stats');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const { data } = await api.get<DashboardStats>('/dashboard/stats');
         setStats({
-          totalUsers: 248,
-          activeUsers: 186,
-          accessesToday: 47,
-          expiredMemberships: 12,
-          monthlyRevenue: 15420,
-          recentAccess: [
-            { id: '1', userName: 'Carlos Rodriguez', time: 'Hace 2 min', status: 'granted' },
-            { id: '2', userName: 'Maria Garcia', time: 'Hace 5 min', status: 'granted' },
-            { id: '3', userName: 'Juan Martinez', time: 'Hace 8 min', status: 'denied' },
-            { id: '4', userName: 'Ana Lopez', time: 'Hace 12 min', status: 'granted' },
-            { id: '5', userName: 'Pedro Sanchez', time: 'Hace 15 min', status: 'granted' },
-          ]
+          ...data,
+          recentAccess: data.recentAccess.map((a) => ({
+            ...a,
+            time: formatRelativeTime(a.time),
+          })),
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -143,7 +149,7 @@ export default function Dashboard() {
     };
 
     fetchStats();
-  }, []);
+  }, [showAlert]);
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -152,6 +158,11 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Vista general de tu gimnasio</p>
+          {!loading && stats != null && (
+            <p className="text-sm text-muted-foreground/80 mt-0.5">
+              {stats.totalUsers} usuarios registrados en el tenant
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button className="h-8 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors flex items-center gap-2">

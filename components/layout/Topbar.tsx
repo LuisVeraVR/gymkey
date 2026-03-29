@@ -17,38 +17,11 @@ interface Notification {
   read: boolean;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    title: 'Nuevo usuario registrado',
-    message: 'Carlos Ruiz se ha registrado correctamente.',
-    time: 'Hace 5 min',
-    type: 'success',
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'Pago pendiente',
-    message: 'La membresía de Ana García vence pronto.',
-    time: 'Hace 1 hora',
-    type: 'warning',
-    read: false,
-  },
-  {
-    id: '3',
-    title: 'Mantenimiento del sistema',
-    message: 'Programado para esta noche a las 00:00.',
-    time: 'Hace 3 horas',
-    type: 'info',
-    read: true,
-  },
-];
-
 export default function Topbar() {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const { theme, setTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
@@ -160,8 +133,17 @@ export default function Topbar() {
               <div className="absolute right-0 mt-3 w-80 bg-card/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 animate-fadeIn overflow-hidden">
                 <div className="p-4 border-b border-border/50 flex items-center justify-between bg-muted/30">
                   <div>
-                    <h3 className="text-sm font-semibold text-foreground">Notificaciones</h3>
-                    <p className="text-xs text-muted-foreground">{unreadCount} sin leer</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-semibold text-foreground">Notificaciones</h3>
+                      <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        Demo
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {notifications.length === 0
+                        ? 'Sin conexión en vivo al backend de notificaciones'
+                        : `${unreadCount} sin leer`}
+                    </p>
                   </div>
                   {unreadCount > 0 && (
                     <button 
@@ -177,7 +159,10 @@ export default function Topbar() {
                   {notifications.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">
                       <Bell className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                      <p className="text-sm">No tienes notificaciones</p>
+                      <p className="text-xs leading-relaxed max-w-[240px] mx-auto">
+                        Las notificaciones en tiempo real se integrarán con el gateway de
+                        notificaciones de la API. Por ahora esta lista está vacía.
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y divide-border/30">

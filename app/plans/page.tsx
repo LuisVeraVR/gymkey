@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '@/lib/api';
+import { useAuth } from '@/context/auth-context';
 import { useAlert } from '@/components/ui/CustomAlert';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { useSocket } from '@/context/socket-context';
 import { useSettings } from '@/context/settings-context';
+import { formatMoney } from '@/lib/format-money';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 // Interfaces
@@ -15,7 +18,7 @@ interface Plan {
   name: string;
   type: 'Mensual' | 'Anual' | 'Especial';
   price: number;
-  description: string;
+  description: string | null;
   active: boolean;
   features: string[];
 }
@@ -23,7 +26,7 @@ interface Plan {
 interface Discount {
   id: string;
   name: string;
-  type: 'Porcentaje' | 'Monto Fijo';
+  type: string;
   value: number;
   code: string;
   active: boolean;
@@ -48,11 +51,15 @@ type DiscountFormData = {
   applicablePlanIds: string[];
 };
 
+const ADMIN_PLAN_ROLES = ['SUPER_ADMIN', 'GYM_ADMIN'] as const;
+
 export default function PlansPage() {
+  const router = useRouter();
+  const { user: authUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'planes' | 'descuentos'>('planes');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const { currency } = useSettings();
+  const { currency, locale } = useSettings();
   const { showAlert } = useAlert();
   const [loading, setLoading] = useState(true);
 
@@ -121,10 +128,6 @@ export default function PlansPage() {
     };
   }, [socket, isConnected]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -141,6 +144,22 @@ export default function PlansPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authUser) return;
+    if (!ADMIN_PLAN_ROLES.includes(authUser.role as (typeof ADMIN_PLAN_ROLES)[number])) {
+      router.replace('/dashboard');
+      return;
+    }
+    fetchData();
+  }, [authUser, router]); // eslint-disable-line react-hooks/exhaustive-deps -- fetch al obtener usuario con rol válido
+
+  if (
+    authUser &&
+    !ADMIN_PLAN_ROLES.includes(authUser.role as (typeof ADMIN_PLAN_ROLES)[number])
+  ) {
+    return null;
+  }
 
   const handleOpenModal = (type: 'plan' | 'discount', item?: Plan | Discount) => {
     setModalType(type);
@@ -164,9 +183,9 @@ export default function PlansPage() {
             name: plan.name,
             type: plan.type,
             price: plan.price,
-            description: plan.description,
+            description: plan.description ?? '',
             active: plan.active,
-            features: plan.features,
+            features: plan.features?.length ? plan.features : [''],
           });
       }
     } else {
@@ -297,7 +316,9 @@ export default function PlansPage() {
 
   const planTypeValue: Plan['type'] = isPlanFormData(formData) ? formData.type : 'Mensual';
   const planPriceValue: PlanFormData['price'] = isPlanFormData(formData) ? formData.price : 0;
-  const planDescriptionValue: PlanFormData['description'] = isPlanFormData(formData) ? formData.description : '';
+  const planDescriptionValue: PlanFormData['description'] = isPlanFormData(formData)
+    ? (formData.description ?? '')
+    : '';
   const planFeaturesValue: PlanFormData['features'] = isPlanFormData(formData) ? formData.features : [];
 
   const discountTypeValue: Discount['type'] = isDiscountFormData(formData) ? formData.type : 'Porcentaje';
@@ -418,14 +439,15 @@ export default function PlansPage() {
                   
                   <h3 className="text-xl font-bold text-foreground mb-1">{plan.name}</h3>
                   <div className="text-3xl font-bold text-primary mb-4">
-                    {currency === 'COP' ? '$' : currency === 'EUR' ? '€' : '$'}
-                    {plan.price}
+                    {formatMoney(plan.price, currency, locale)}
                     <span className="text-sm font-normal text-muted-foreground ml-1">
                       /{plan.type === 'Anual' ? 'año' : 'mes'}
                     </span>
                   </div>
                   
-                  <p className="text-sm text-muted-foreground mb-6 line-clamp-2 h-10">{plan.description}</p>
+                  <p className="text-sm text-muted-foreground mb-6 line-clamp-2 h-10">
+                    {plan.description ?? ''}
+                  </p>
                   
                   <div className="space-y-2 mb-4">
                     {plan.features.slice(0, 3).map((feature, idx) => (
@@ -468,10 +490,10 @@ export default function PlansPage() {
                 <div key={discount.id} className="group relative bg-card hover:bg-card/80 border border-border/50 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1">
                   <div className="flex justify-between items-start mb-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      discount.type === 'Porcentaje' ? 'bg-orange-500/10 text-orange-500' :
+                      discount.type === 'Porcentaje' || discount.type === 'PERCENTAGE' ? 'bg-orange-500/10 text-orange-500' :
                       'bg-blue-500/10 text-blue-500'
                     }`}>
-                      {discount.type}
+                      {discount.type === 'PERCENTAGE' ? 'Porcentaje' : discount.type === 'FIXED' ? 'Monto fijo' : discount.type}
                     </span>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
@@ -495,7 +517,9 @@ export default function PlansPage() {
                   
                   <h3 className="text-xl font-bold text-foreground mb-1">{discount.name}</h3>
                   <div className="text-3xl font-bold text-primary mb-2">
-                    {discount.type === 'Porcentaje' ? `${discount.value}%` : `${currency === 'COP' ? '$' : currency === 'EUR' ? '€' : '$'}${discount.value}`}
+                    {discount.type === 'Porcentaje' || discount.type === 'PERCENTAGE'
+                      ? `${discount.value}%`
+                      : formatMoney(discount.value, currency, locale)}
                     <span className="text-sm font-normal text-muted-foreground ml-1">OFF</span>
                   </div>
                   <div className="bg-muted px-3 py-1 rounded-md w-fit text-xs font-mono mb-4 text-foreground/80">
@@ -574,12 +598,12 @@ export default function PlansPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Precio</label>
                       <div className="relative">
-                        <span className="absolute left-3 top-2 text-muted-foreground text-xs">
-                            {currency === 'COP' ? '$' : currency === 'EUR' ? '€' : '$'}
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs pointer-events-none max-w-[3.5rem] truncate">
+                          {currency}
                         </span>
                         <input 
                           type="number" 
-                          className="w-full h-8 pl-7 pr-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                          className="w-full h-8 pl-14 pr-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                           value={planPriceValue}
                           onChange={(e) => updatePlanForm({ price: e.target.value })}
                           placeholder="0.00"
@@ -654,13 +678,22 @@ export default function PlansPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Valor</label>
-                      <input 
-                        type="number" 
-                        className="w-full h-8 px-3 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
-                        value={discountValueValue}
-                        onChange={(e) => updateDiscountForm({ value: e.target.value })}
-                        placeholder="0"
-                      />
+                      <div className="relative">
+                        {discountTypeValue === 'Monto Fijo' && (
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs pointer-events-none max-w-[3.5rem] truncate">
+                            {currency}
+                          </span>
+                        )}
+                        <input 
+                          type="number" 
+                          className={`w-full h-8 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm ${
+                            discountTypeValue === 'Monto Fijo' ? 'pl-14 pr-3' : 'px-3'
+                          }`}
+                          value={discountValueValue}
+                          onChange={(e) => updateDiscountForm({ value: e.target.value })}
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
                   </div>
 

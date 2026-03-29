@@ -109,8 +109,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     
-    // Minimum loading time (3 seconds) for pro feel
-    const minLoadTime = new Promise(resolve => setTimeout(resolve, 3000));
+    const minLoadTime = new Promise((resolve) => setTimeout(resolve, 400));
     
     try {
       const [authResponse] = await Promise.all([
@@ -289,7 +288,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   placeholder="admin@gymkey.com"
                 />
               </div>
@@ -314,7 +313,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-8 px-2 pr-10 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    className="w-full h-11 px-3 pr-11 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                     placeholder="••••••••"
                   />
                   <button
@@ -352,7 +351,7 @@ export default function LoginPage() {
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   placeholder="••••••••"
                 />
               </div>
@@ -363,7 +362,7 @@ export default function LoginPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                   placeholder="••••••••"
                 />
               </div>
@@ -404,7 +403,7 @@ export default function LoginPage() {
                   maxLength={6}
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
+                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
                   placeholder="000000"
                 />
             </div>
@@ -448,7 +447,7 @@ export default function LoginPage() {
                   maxLength={6}
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value)}
-                  className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
+                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
                   placeholder="000000"
                 />
             </div>
@@ -513,7 +512,7 @@ export default function LoginPage() {
                     required
                     value={fpEmail}
                     onChange={(e) => setFpEmail(e.target.value)}
-                    className="w-full h-8 px-2 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                     placeholder="admin@gymkey.com"
                 />
             </div>

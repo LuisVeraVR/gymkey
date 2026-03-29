@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import api from '@/lib/api';
+import { useAlert } from '@/components/ui/CustomAlert';
 import { CustomSelect } from '@/components/ui/CustomSelect';
+import { Skeleton } from '@/components/ui/Skeleton';
 
-type ActionType = 'user_created' | 'user_updated' | 'user_deleted' | 'access_granted' | 'access_denied' | 'payment_received' | 'subscription_created' | 'subscription_expired' | 'settings_changed' | 'login' | 'logout';
+type ActionVisual = { icon: React.ReactNode; label: string; color: string };
 
 interface AuditEvent {
   id: string;
-  action: ActionType;
+  action: string;
   actor: {
     name: string;
     email: string;
@@ -21,9 +24,16 @@ interface AuditEvent {
   details?: string;
   timestamp: string;
   date: string;
+  rawTimestamp: string;
 }
 
-const actionConfig: Record<ActionType, { icon: React.ReactNode; label: string; color: string }> = {
+const docIcon = (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const actionVisuals: Record<string, ActionVisual> = {
   user_created: {
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -79,12 +89,8 @@ const actionConfig: Record<ActionType, { icon: React.ReactNode; label: string; c
     color: 'bg-success/10 text-success',
   },
   subscription_created: {
-    icon: (
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-    label: 'Membresia creada',
+    icon: docIcon,
+    label: 'Membresía creada',
     color: 'bg-primary/10 text-primary',
   },
   subscription_expired: {
@@ -93,7 +99,7 @@ const actionConfig: Record<ActionType, { icon: React.ReactNode; label: string; c
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
       </svg>
     ),
-    label: 'Membresia vencida',
+    label: 'Membresía vencida',
     color: 'bg-warning/10 text-warning',
   },
   settings_changed: {
@@ -112,7 +118,7 @@ const actionConfig: Record<ActionType, { icon: React.ReactNode; label: string; c
         <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
       </svg>
     ),
-    label: 'Inicio de sesion',
+    label: 'Inicio de sesión',
     color: 'bg-info/10 text-info',
   },
   logout: {
@@ -121,111 +127,119 @@ const actionConfig: Record<ActionType, { icon: React.ReactNode; label: string; c
         <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
       </svg>
     ),
-    label: 'Cierre de sesion',
+    label: 'Cierre de sesión',
     color: 'bg-muted text-muted-foreground',
+  },
+  plan_created: {
+    icon: docIcon,
+    label: 'Plan creado',
+    color: 'bg-primary/10 text-primary',
+  },
+  plan_updated: {
+    icon: docIcon,
+    label: 'Plan actualizado',
+    color: 'bg-info/10 text-info',
+  },
+  plan_deleted: {
+    icon: docIcon,
+    label: 'Plan eliminado',
+    color: 'bg-destructive/10 text-destructive',
+  },
+  discount_created: {
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+      </svg>
+    ),
+    label: 'Descuento creado',
+    color: 'bg-primary/10 text-primary',
+  },
+  discount_updated: {
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+      </svg>
+    ),
+    label: 'Descuento actualizado',
+    color: 'bg-info/10 text-info',
+  },
+  discount_deleted: {
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+      </svg>
+    ),
+    label: 'Descuento eliminado',
+    color: 'bg-destructive/10 text-destructive',
   },
 };
 
-// Sample audit data
-const sampleAuditEvents: AuditEvent[] = [
-  {
-    id: '1',
-    action: 'access_granted',
-    actor: { name: 'Sistema', email: 'system@gymkey.com', role: 'SYSTEM' },
-    target: { type: 'user', name: 'Carlos Rodriguez', id: 'usr_1' },
-    details: 'Acceso al gimnasio validado correctamente',
-    timestamp: '10:45',
-    date: 'Hoy',
-  },
-  {
-    id: '2',
-    action: 'user_created',
-    actor: { name: 'Admin Principal', email: 'admin@gimnasio.com', role: 'GYM_ADMIN' },
-    target: { type: 'user', name: 'Maria Garcia', id: 'usr_2' },
-    details: 'Nuevo miembro registrado con plan mensual',
-    timestamp: '10:32',
-    date: 'Hoy',
-  },
-  {
-    id: '3',
-    action: 'payment_received',
-    actor: { name: 'Sistema', email: 'system@gymkey.com', role: 'SYSTEM' },
-    target: { type: 'user', name: 'Juan Martinez', id: 'usr_3' },
-    details: 'Pago de membresia mensual - $50.00',
-    timestamp: '10:15',
-    date: 'Hoy',
-  },
-  {
-    id: '4',
-    action: 'access_denied',
-    actor: { name: 'Sistema', email: 'system@gymkey.com', role: 'SYSTEM' },
-    target: { type: 'user', name: 'Pedro Sanchez', id: 'usr_4' },
-    details: 'Membresia vencida - Ultimo pago hace 35 dias',
-    timestamp: '09:58',
-    date: 'Hoy',
-  },
-  {
-    id: '5',
-    action: 'login',
-    actor: { name: 'Staff Recepcion', email: 'staff@gimnasio.com', role: 'STAFF' },
-    timestamp: '09:30',
-    date: 'Hoy',
-  },
-  {
-    id: '6',
-    action: 'user_updated',
-    actor: { name: 'Admin Principal', email: 'admin@gimnasio.com', role: 'GYM_ADMIN' },
-    target: { type: 'user', name: 'Ana Lopez', id: 'usr_5' },
-    details: 'Actualizado rol de MEMBER a COACH',
-    timestamp: '09:15',
-    date: 'Hoy',
-  },
-  {
-    id: '7',
-    action: 'subscription_expired',
-    actor: { name: 'Sistema', email: 'system@gymkey.com', role: 'SYSTEM' },
-    target: { type: 'user', name: 'Roberto Diaz', id: 'usr_6' },
-    details: 'Membresia trimestral vencida',
-    timestamp: '00:00',
-    date: 'Hoy',
-  },
-  {
-    id: '8',
-    action: 'settings_changed',
-    actor: { name: 'Admin Principal', email: 'admin@gimnasio.com', role: 'GYM_ADMIN' },
-    details: 'Horario de apertura modificado: 6:00 AM - 10:00 PM',
-    timestamp: '18:45',
-    date: 'Ayer',
-  },
-  {
-    id: '9',
-    action: 'subscription_created',
-    actor: { name: 'Staff Recepcion', email: 'staff@gimnasio.com', role: 'STAFF' },
-    target: { type: 'user', name: 'Laura Torres', id: 'usr_7' },
-    details: 'Nueva membresia anual activada',
-    timestamp: '16:30',
-    date: 'Ayer',
-  },
-  {
-    id: '10',
-    action: 'logout',
-    actor: { name: 'Admin Principal', email: 'admin@gimnasio.com', role: 'GYM_ADMIN' },
-    timestamp: '20:00',
-    date: 'Ayer',
-  },
-];
+function getActionVisual(action: string): ActionVisual {
+  const known = actionVisuals[action];
+  if (known) return known;
+  const human = action.replace(/_/g, ' ');
+  return {
+    icon: docIcon,
+    label: human.charAt(0).toUpperCase() + human.slice(1),
+    color: 'bg-muted text-muted-foreground',
+  };
+}
+
+function calendarDayLabel(d: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const y = new Date(d);
+  y.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - y.getTime()) / 86400000);
+  if (diffDays === 0) return 'Hoy';
+  if (diffDays === 1) return 'Ayer';
+  return d.toLocaleDateString('es', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+type ApiAuditRow = {
+  id: string;
+  action: string;
+  details: unknown;
+  timestamp: string;
+  user: { id: string; name: string | null; email: string; role: string } | null;
+};
+
+function mapApiToEvents(rows: ApiAuditRow[]): AuditEvent[] {
+  return rows.map((row) => {
+    const ts = new Date(row.timestamp);
+    const detailsObj = row.details as { summary?: string } | null;
+    const summary = detailsObj && typeof detailsObj.summary === 'string' ? detailsObj.summary : undefined;
+
+    return {
+      id: row.id,
+      action: row.action,
+      actor: {
+        name: row.user?.name?.trim() || row.user?.email || 'Sistema',
+        email: row.user?.email || '—',
+        role: row.user?.role || 'SYSTEM',
+      },
+      details: summary,
+      timestamp: ts.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }),
+      date: calendarDayLabel(ts),
+      rawTimestamp: row.timestamp,
+    };
+  });
+}
 
 function AuditEventCard({ event }: { event: AuditEvent }) {
-  const config = actionConfig[event.action];
+  const config = getActionVisual(event.action);
 
   return (
     <div className="flex gap-3 p-3 hover:bg-muted/20 transition-colors rounded-lg group">
-      {/* Icon */}
       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
         {config.icon}
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -233,7 +247,8 @@ function AuditEventCard({ event }: { event: AuditEvent }) {
               {config.label}
               {event.target && (
                 <span className="text-muted-foreground font-normal">
-                  {' - '}{event.target.name}
+                  {' - '}
+                  {event.target.name}
                 </span>
               )}
             </p>
@@ -256,58 +271,130 @@ function AuditEventCard({ event }: { event: AuditEvent }) {
 
 type FilterType = 'all' | 'users' | 'access' | 'payments' | 'system';
 
+const SYSTEM_ACTIONS = [
+  'settings_changed',
+  'login',
+  'logout',
+  'plan_created',
+  'plan_updated',
+  'plan_deleted',
+  'discount_created',
+  'discount_updated',
+  'discount_deleted',
+];
+
 export default function AuditPage() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
 
-  const filterEvents = (events: AuditEvent[]) => {
-    return events.filter(event => {
-      const matchesSearch = searchQuery === '' || 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get<ApiAuditRow[]>('/audit-logs?limit=300');
+        if (!cancelled) setEvents(mapApiToEvents(data));
+      } catch {
+        if (!cancelled) {
+          showAlert('error', 'No se pudo cargar el registro de auditoría');
+          setEvents([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showAlert]);
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const matchesSearch =
+        searchQuery === '' ||
         event.actor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.target?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.details?.toLowerCase().includes(searchQuery.toLowerCase());
+        event.actor.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (event.details?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        event.action.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesFilter = filter === 'all' ||
-        (filter === 'users' && ['user_created', 'user_updated', 'user_deleted'].includes(event.action)) ||
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'users' &&
+          ['user_created', 'user_updated', 'user_deleted'].includes(event.action)) ||
         (filter === 'access' && ['access_granted', 'access_denied'].includes(event.action)) ||
-        (filter === 'payments' && ['payment_received', 'subscription_created', 'subscription_expired'].includes(event.action)) ||
-        (filter === 'system' && ['settings_changed', 'login', 'logout'].includes(event.action));
+        (filter === 'payments' &&
+          ['payment_received', 'subscription_created', 'subscription_expired'].includes(event.action)) ||
+        (filter === 'system' && SYSTEM_ACTIONS.includes(event.action));
 
       return matchesSearch && matchesFilter;
     });
-  };
+  }, [events, filter, searchQuery]);
 
-  const filteredEvents = filterEvents(sampleAuditEvents);
+  const groupedEvents = useMemo(() => {
+    return filteredEvents.reduce(
+      (acc, event) => {
+        if (!acc[event.date]) acc[event.date] = [];
+        acc[event.date].push(event);
+        return acc;
+      },
+      {} as Record<string, AuditEvent[]>,
+    );
+  }, [filteredEvents]);
 
-  // Group events by date
-  const groupedEvents = filteredEvents.reduce((acc, event) => {
-    if (!acc[event.date]) {
-      acc[event.date] = [];
+  const stats = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    let today = 0;
+    let accessGranted = 0;
+    let accessDenied = 0;
+    for (const e of events) {
+      const t = new Date(e.rawTimestamp);
+      if (t >= start) today += 1;
+      if (e.action === 'access_granted') accessGranted += 1;
+      if (e.action === 'access_denied') accessDenied += 1;
     }
-    acc[event.date].push(event);
-    return acc;
-  }, {} as Record<string, AuditEvent[]>);
+    return {
+      total: events.length,
+      today,
+      accessGranted,
+      accessDenied,
+    };
+  }, [events]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fadeIn p-1">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Auditoria</h1>
-          <p className="text-muted-foreground mt-1">Registro de todas las actividades del sistema</p>
-        </div>
-        <button className="h-8 px-4 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Exportar Log
-        </button>
+      <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+        Registro persistido en base de datos. Se añaden entradas al guardar configuración, planes y
+        descuentos; con el tiempo se pueden enlazar más acciones (accesos, pagos, usuarios).
       </div>
 
-      {/* Filters */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Auditoría</h1>
+          <p className="text-muted-foreground mt-1">Historial de actividades del tenant</p>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -318,7 +405,7 @@ export default function AuditPage() {
             className="w-full h-8 pl-10 pr-4 bg-card border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
           />
         </div>
-        
+
         <div className="w-full sm:w-[200px]">
           <CustomSelect
             value={filter}
@@ -328,20 +415,19 @@ export default function AuditPage() {
               { value: 'users', label: 'Usuarios' },
               { value: 'access', label: 'Accesos' },
               { value: 'payments', label: 'Pagos' },
-              { value: 'system', label: 'Sistema' },
+              { value: 'system', label: 'Sistema y catálogo' },
             ]}
             placeholder="Filtrar por tipo"
           />
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total eventos hoy', value: '47', color: 'text-foreground' },
-          { label: 'Accesos permitidos', value: '38', color: 'text-success' },
-          { label: 'Accesos denegados', value: '3', color: 'text-destructive' },
-          { label: 'Usuarios activos', value: '12', color: 'text-primary' },
+          { label: 'Eventos hoy', value: String(stats.today), color: 'text-foreground' },
+          { label: 'Accesos permitidos (total)', value: String(stats.accessGranted), color: 'text-success' },
+          { label: 'Accesos denegados (total)', value: String(stats.accessDenied), color: 'text-destructive' },
+          { label: 'Total en historial', value: String(stats.total), color: 'text-primary' },
         ].map((stat) => (
           <div key={stat.label} className="bg-card border border-border rounded-lg p-4">
             <p className="text-xs text-muted-foreground">{stat.label}</p>
@@ -350,7 +436,6 @@ export default function AuditPage() {
         ))}
       </div>
 
-      {/* Timeline */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         {Object.keys(groupedEvents).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -359,19 +444,21 @@ export default function AuditPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">Sin resultados</h3>
-            <p className="text-muted-foreground text-sm">
-              No se encontraron eventos con los filtros seleccionados
+            <h3 className="text-lg font-semibold text-foreground mb-1">Sin eventos</h3>
+            <p className="text-muted-foreground text-sm max-w-sm">
+              {events.length === 0
+                ? 'Aún no hay registros. Al guardar configuración o modificar planes/descuentos aparecerán aquí.'
+                : 'No hay resultados con los filtros seleccionados.'}
             </p>
           </div>
         ) : (
-          Object.entries(groupedEvents).map(([date, events]) => (
+          Object.entries(groupedEvents).map(([date, group]) => (
             <div key={date}>
               <div className="px-4 py-3 bg-muted/30 border-b border-border">
-                <h3 className="text-sm font-semibold text-foreground">{date}</h3>
+                <h3 className="text-sm font-semibold text-foreground capitalize">{date}</h3>
               </div>
               <div className="divide-y divide-border">
-                {events.map((event) => (
+                {group.map((event) => (
                   <AuditEventCard key={event.id} event={event} />
                 ))}
               </div>
@@ -379,15 +466,6 @@ export default function AuditPage() {
           ))
         )}
       </div>
-
-      {/* Load More */}
-      {filteredEvents.length > 0 && (
-        <div className="flex justify-center">
-          <button className="h-8 px-6 bg-secondary hover:bg-secondary-hover text-secondary-foreground text-sm font-medium rounded-md transition-colors">
-            Cargar mas eventos
-          </button>
-        </div>
-      )}
     </div>
   );
 }
