@@ -6,14 +6,13 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { setSessionExpiredHandler } from '../api';
 import {
   clearStoredAccessToken,
   getStoredAccessToken,
   setStoredAccessToken,
 } from '../tokenStorage';
-import { theme } from '../theme';
 
 type AuthContextValue = {
   token: string | null;
@@ -59,8 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <View style={styles.boot}>
-        <ActivityIndicator size="large" color={theme.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#030303' }}>
+        <ActivityIndicator size="large" color="#10b981" />
       </View>
     );
   }
@@ -77,12 +76,3 @@ export function useAuth() {
   }
   return ctx;
 }
-
-const styles = StyleSheet.create({
-  boot: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.surface,
-  },
-});

@@ -1,15 +1,20 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import { useSocket } from '@/context/socket-context';
+import { usePlatform } from '@/context/platform-context';
+import api from '@/lib/api';
 
 type MenuItem = {
   name: string;
   href: string;
   icon: ReactNode;
   roles?: string[];
+  feature?: 'discounts' | 'classBookings';
+  billingOnly?: boolean;
 };
 
 type MenuGroup = {
@@ -59,6 +64,7 @@ const menuGroups: MenuGroup[] = [
         name: 'Descuentos', 
         href: '/discounts', 
         roles: ['SUPER_ADMIN', 'GYM_ADMIN'],
+        feature: 'discounts',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
@@ -106,6 +112,16 @@ const menuGroups: MenuGroup[] = [
           </svg>
         )
       },
+      { 
+        name: 'Clases', 
+        href: '/classes', 
+        feature: 'classBookings',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3a.75.75 0 011.5 0v1.5h1.5A2.25 2.25 0 0121.75 6.75v12A2.25 2.25 0 0119.5 21h-15a2.25 2.25 0 01-2.25-2.25v-12A2.25 2.25 0 014.5 4.5H6V3a.75.75 0 01.75-.75zM4.5 9h15" />
+          </svg>
+        )
+      },
     ]
   },
   {
@@ -117,6 +133,17 @@ const menuGroups: MenuGroup[] = [
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      },
+      { 
+        name: 'Facturación', 
+        href: '/billing', 
+        roles: ['SUPER_ADMIN', 'GYM_ADMIN'],
+        billingOnly: true,
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M3.75 6.75h16.5A1.5 1.5 0 0121.75 8.25v7.5A1.5 1.5 0 0120.25 17.25H3.75a1.5 1.5 0 01-1.5-1.5v-7.5a1.5 1.5 0 011.5-1.5zM6.75 12h3.75" />
           </svg>
         )
       },
@@ -142,7 +169,38 @@ interface SidebarProps {
 
 export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { isConnected } = useSocket();
+  const { subscription, usage, hasFeature, isBillingBlocked, isTrialing, daysLeftInTrial } = usePlatform();
+  const displayName =
+    user?.name?.trim() || user?.email?.split('@')[0] || 'Usuario';
+  const [accessBadge, setAccessBadge] = useState(0);
+  const [auditBadge, setAuditBadge] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadIndicators = async () => {
+      try {
+        const { data } = await api.get<{
+          accessTodayCount: number;
+          recentAuditCount: number;
+        }>('/dashboard/sidebar-indicators');
+        if (!mounted) return;
+        setAccessBadge(data.accessTodayCount || 0);
+        setAuditBadge(data.recentAuditCount || 0);
+      } catch {
+        if (!mounted) return;
+        setAccessBadge(0);
+        setAuditBadge(0);
+      }
+    };
+    loadIndicators();
+    const id = setInterval(loadIndicators, 60000);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   return (
     <aside 
@@ -200,12 +258,15 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
                 if (item.roles && (!user || !item.roles.includes(user.role))) {
                   return null;
                 }
+                const lockedByFeature = item.feature ? !hasFeature(item.feature) : false;
+                const forcedBilling = item.billingOnly || lockedByFeature;
                 
+                const effectiveHref = forcedBilling && item.href !== '/billing' ? '/billing' : item.href;
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={effectiveHref}
                     title={isCollapsed ? item.name : ''}
                     className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${
                       isActive 
@@ -217,7 +278,24 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
                       {item.icon}
                     </div>
                     {!isCollapsed && (
-                      <span className="whitespace-nowrap animate-fadeIn">{item.name}</span>
+                      <>
+                        <span className="whitespace-nowrap animate-fadeIn">{item.name}</span>
+                        {lockedByFeature && (
+                          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
+                            Pro
+                          </span>
+                        )}
+                        {item.href === '/access' && accessBadge > 0 && (
+                          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-semibold">
+                            {accessBadge}
+                          </span>
+                        )}
+                        {item.href === '/audit' && auditBadge > 0 && (
+                          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
+                            {auditBadge}
+                          </span>
+                        )}
+                      </>
                     )}
                   </Link>
                 );
@@ -232,19 +310,71 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
         ))}
       </nav>
       
-      {/* Footer Toggle (Optional placement, but user asked for sidebar toggle, putting it in header or footer is common. I put it in header. ) */}
-      {/* If collapsed, show a small expand button at bottom maybe? */}
-      <div className="p-4 border-t border-border/40 flex justify-end">
-          {isCollapsed && (
-              <button 
-              onClick={toggleSidebar}
-              className="mx-auto p-2 rounded-lg text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            >
-               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-               </svg>
-            </button>
+      <div className={`border-t border-border/40 ${isCollapsed ? 'p-3' : 'p-4'}`}>
+        {!isCollapsed && subscription && usage && (
+          <div className="mb-4 space-y-2 rounded-2xl border border-border/50 bg-muted/30 p-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-foreground">Plan {subscription.plan}</span>
+              {isTrialing ? (
+                <span className="text-primary">Trial {daysLeftInTrial ?? 0}d</span>
+              ) : isBillingBlocked ? (
+                <span className="text-destructive">Bloqueado</span>
+              ) : (
+                <span className="text-success">Activo</span>
+              )}
+            </div>
+            {([
+              ['Miembros', usage.members],
+              ['Staff', usage.staff],
+              ['Rutinas', usage.routines],
+            ] as const).map(([label, metric]) => {
+              const percent =
+                metric.max > 0 ? Math.min(100, Math.round((metric.current / metric.max) * 100)) : 0;
+              return (
+                <div key={label}>
+                  <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{label}</span>
+                    <span>{metric.current} / {metric.max < 0 ? 'Ilimitado' : metric.max}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-border/50">
+                    <div className={`h-2 rounded-full ${percent >= 100 ? 'bg-destructive' : percent >= 80 ? 'bg-warning' : 'bg-primary'}`} style={{ width: `${metric.max < 0 ? 0 : percent}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className={`flex items-center ${isCollapsed ? 'justify-center gap-2' : 'justify-between gap-3'}`}>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || '-'}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span
+                  className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-destructive'}`}
+                />
+                <span className="text-[10px] text-muted-foreground">
+                  {isConnected ? 'Socket conectado' : 'Socket desconectado'}
+                </span>
+              </div>
+            </div>
           )}
+          <button
+            onClick={() => void logout()}
+            title="Cerrar sesión"
+            className="p-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m-7.5-3h12m0 0l-3-3m3 3l-3 3" />
+            </svg>
+          </button>
+          {isCollapsed && (
+            <span
+              title={isConnected ? 'Socket conectado' : 'Socket desconectado'}
+              className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-destructive'}`}
+            />
+          )}
+        </div>
       </div>
 
     </aside>

@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserRole } from '@prisma/client';
 import { UsersService } from '../users/users.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 const authTokenCookie = {
   httpOnly: false,
@@ -36,6 +37,18 @@ export class AuthController {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     const result = await this.authService.login(user);
+
+    if (
+      result &&
+      typeof result === 'object' &&
+      'access_token' in result &&
+      typeof (result as { access_token?: unknown }).access_token === 'string'
+    ) {
+      res.cookie('token', (result as { access_token: string }).access_token, {
+        ...authTokenCookie,
+        maxAge: 24 * 60 * 60 * 1000,
+      });
+    }
 
     // Always return the result (which contains tempToken and flags)
     // The frontend must handle the flow (verify, skip, or enable)
@@ -164,6 +177,18 @@ export class AuthController {
 
     const result = await this.authService.login(user);
 
+    if (
+      result &&
+      typeof result === 'object' &&
+      'access_token' in result &&
+      typeof (result as { access_token?: unknown }).access_token === 'string'
+    ) {
+      res.cookie('token', (result as { access_token: string }).access_token, {
+        ...authTokenCookie,
+        maxAge: 24 * 60 * 60 * 1000,
+      });
+    }
+
     // Admin login also follows the same flow (check for temp token or full token)
     return result;
   }
@@ -186,7 +211,7 @@ export class AuthController {
   @Post('change-password')
   async changePassword(
     @Request() req: any,
-    @Body() body: { password: string },
+    @Body() body: ChangePasswordDto,
   ) {
     return this.authService.changePassword(req.user.sub, body.password);
   }

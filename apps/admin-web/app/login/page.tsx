@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import api from '@/lib/api';
 import { QRCodeSVG } from 'qrcode.react';
@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Globe, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
+  const MFA_LENGTH = 6;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const [tempToken, setTempToken] = useState('');
   const [otpauthUrl, setOtpauthUrl] = useState('');
   const [mfaCode, setMfaCode] = useState('');
+  const mfaInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [canSkip, setCanSkip] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,15 +42,62 @@ export default function LoginPage() {
   const [fpEmail, setFpEmail] = useState('');
   const [fpSubmitted, setFpSubmitted] = useState(false);
 
-  const fetchMfaSecret = async (token: string) => {
-      try {
-          const { data } = await api.post('/auth/mfa/generate', {}, {
-              headers: { Authorization: `Bearer ${token}` }
-          });
-          setOtpauthUrl(data.otpauthUrl);
-      } catch (err) {
-          showAlert('error', 'Error al generar MFA secret');
+  const normalizeMfaCode = (value: string) =>
+    value.replace(/\D/g, '').slice(0, MFA_LENGTH);
+
+  const focusMfaIndex = (index: number) => {
+    if (index < 0 || index >= MFA_LENGTH) return;
+    mfaInputRefs.current[index]?.focus();
+  };
+
+  useEffect(() => {
+    if (step !== 'mfa_verify' && step !== 'mfa_setup') return;
+    const id = setTimeout(() => focusMfaIndex(0), 0);
+    return () => clearTimeout(id);
+  }, [step]);
+
+  const handleMfaDigitChange = (index: number, value: string) => {
+    const digits = normalizeMfaCode(value);
+    if (!digits) {
+      const chars = mfaCode.padEnd(MFA_LENGTH, ' ').split('');
+      chars[index] = ' ';
+      setMfaCode(chars.join('').replace(/\s/g, ''));
+      return;
+    }
+
+    if (digits.length > 1) {
+      setMfaCode(digits);
+      focusMfaIndex(Math.min(digits.length, MFA_LENGTH - 1));
+      return;
+    }
+
+    const chars = mfaCode.padEnd(MFA_LENGTH, ' ').split('');
+    chars[index] = digits;
+    setMfaCode(chars.join('').replace(/\s/g, ''));
+    if (index < MFA_LENGTH - 1) {
+      focusMfaIndex(index + 1);
+    }
+  };
+
+  const handleMfaBackspace = (index: number) => {
+    const chars = mfaCode.padEnd(MFA_LENGTH, ' ').split('');
+    if (chars[index]?.trim()) {
+      chars[index] = ' ';
+      setMfaCode(chars.join('').replace(/\s/g, ''));
+      return;
+    }
+    focusMfaIndex(index - 1);
+  };
+
+  const continueWithoutMfaSetup = async (token: string) => {
+      const { data } = await api.post('/auth/mfa/skip', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data?.user) {
+          login(data.user);
+          return true;
       }
+      return false;
   };
 
   const handleAuthResponse = async (data: unknown) => {
@@ -81,20 +130,18 @@ export default function LoginPage() {
       }
       
       if (payload.mfaSetupRequired) {
-          setTempToken(payload.tempToken || '');
-          if (payload.tempToken) await fetchMfaSecret(payload.tempToken);
-          setDirection(1);
-          setStep('mfa_setup');
-          setCanSkip(false);
+          if (payload.tempToken && await continueWithoutMfaSetup(payload.tempToken)) {
+              return;
+          }
+          showAlert('error', 'No se pudo continuar el ingreso');
           return;
       }
       
       if (payload.mfaSetupSuggested) {
-          setTempToken(payload.tempToken || '');
-          if (payload.tempToken) await fetchMfaSecret(payload.tempToken);
-          setDirection(1);
-          setStep('mfa_setup');
-          setCanSkip(true);
+          if (payload.tempToken && await continueWithoutMfaSetup(payload.tempToken)) {
+              return;
+          }
+          showAlert('error', 'No se pudo continuar el ingreso');
           return;
       }
 
@@ -159,10 +206,15 @@ export default function LoginPage() {
 
   const handleMfaVerify = async (e: React.FormEvent) => {
       e.preventDefault();
+      const token = normalizeMfaCode(mfaCode);
+      if (token.length !== MFA_LENGTH) {
+          showAlert('error', 'Ingresa los 6 dígitos');
+          return;
+      }
       setIsLoading(true);
       
       try {
-          const { data } = await api.post('/auth/mfa/verify-login', { token: mfaCode }, {
+          const { data } = await api.post('/auth/mfa/verify-login', { token }, {
               headers: { Authorization: `Bearer ${tempToken}` }
           });
           login(data.user);
@@ -199,10 +251,15 @@ export default function LoginPage() {
 
   const handleMfaEnable = async (e: React.FormEvent) => {
       e.preventDefault();
+      const token = normalizeMfaCode(mfaCode);
+      if (token.length !== MFA_LENGTH) {
+          showAlert('error', 'Ingresa los 6 dígitos');
+          return;
+      }
       setIsLoading(true);
       
       try {
-          const { data } = await api.post('/auth/mfa/enable', { token: mfaCode }, {
+          const { data } = await api.post('/auth/mfa/enable', { token }, {
               headers: { Authorization: `Bearer ${tempToken}` }
           });
           login(data.user);
@@ -221,7 +278,7 @@ export default function LoginPage() {
           });
           login(data.user);
       } catch (err) {
-          showAlert('error', 'Error al omitir MFA');
+          showAlert('error', 'No se pudo continuar el ingreso');
           setIsLoading(false);
       }
   };
@@ -396,16 +453,31 @@ export default function LoginPage() {
       {step === 'mfa_verify' && (
           <form onSubmit={handleMfaVerify} className="space-y-6">
             <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Código de autenticación</label>
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value)}
-                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
-                  placeholder="000000"
-                />
+                <label className="block text-sm font-medium text-foreground mb-2">Código de autenticación</label>
+                <div className="flex items-center justify-between gap-3 w-full">
+                  {Array.from({ length: MFA_LENGTH }).map((_, index) => (
+                    <input
+                      key={`mfa-verify-${index}`}
+                      ref={(el) => {
+                        mfaInputRefs.current[index] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                      pattern="\d*"
+                      maxLength={1}
+                      value={/\d/.test(mfaCode[index] ?? '') ? mfaCode[index] : ''}
+                      onChange={(e) => handleMfaDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace') {
+                          e.preventDefault();
+                          handleMfaBackspace(index);
+                        }
+                      }}
+                      className="h-14 w-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg font-semibold"
+                    />
+                  ))}
+                </div>
             </div>
 
             <button
@@ -440,16 +512,31 @@ export default function LoginPage() {
             </div>
             
             <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Código de verificación</label>
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value)}
-                  className="w-full h-11 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg tracking-widest"
-                  placeholder="000000"
-                />
+                <label className="block text-sm font-medium text-foreground mb-2">Código de verificación</label>
+                <div className="flex items-center justify-between gap-3 w-full">
+                  {Array.from({ length: MFA_LENGTH }).map((_, index) => (
+                    <input
+                      key={`mfa-setup-${index}`}
+                      ref={(el) => {
+                        mfaInputRefs.current[index] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                      pattern="\d*"
+                      maxLength={1}
+                      value={/\d/.test(mfaCode[index] ?? '') ? mfaCode[index] : ''}
+                      onChange={(e) => handleMfaDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace') {
+                          e.preventDefault();
+                          handleMfaBackspace(index);
+                        }
+                      }}
+                      className="h-14 w-12 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-center text-lg font-semibold"
+                    />
+                  ))}
+                </div>
             </div>
 
             <div className="space-y-3">

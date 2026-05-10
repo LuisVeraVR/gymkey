@@ -17,11 +17,18 @@ interface User {
   isActive: boolean;
   lastAccess?: string;
   subscription?: {
+    id?: string;
+    planId?: string;
     status: string;
     planName?: string;
     expiresAt?: string;
-  };
+  } | null;
   mustChangePassword: boolean;
+}
+
+interface PlanOption {
+  id: string;
+  name: string;
 }
 
 type FilterStatus = 'all' | 'active' | 'inactive' | 'expired';
@@ -137,6 +144,8 @@ export default function UsersPage() {
     password: string;
     role: string;
     isActive: boolean;
+    mustChangePassword: boolean;
+    planId?: string;
   };
 
   const [formData, setFormData] = useState({
@@ -144,10 +153,18 @@ export default function UsersPage() {
     email: '',
     password: '',
     role: 'MEMBER',
-    isActive: true
+    isActive: true,
+    mustChangePassword: true,
+    planId: '',
   });
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -161,6 +178,15 @@ export default function UsersPage() {
     }
   };
 
+  const fetchPlans = async () => {
+    try {
+      const { data } = await api.get<PlanOption[]>('/plans');
+      setPlans(data || []);
+    } catch {
+      setPlans([]);
+    }
+  };
+
   useEffect(() => {
     if (!authUser) return;
     if (!ADMIN_USER_ROLES.includes(authUser.role as (typeof ADMIN_USER_ROLES)[number])) {
@@ -168,6 +194,7 @@ export default function UsersPage() {
       return;
     }
     fetchUsers();
+    fetchPlans();
   }, [authUser, router]); // eslint-disable-line react-hooks/exhaustive-deps -- fetch al obtener usuario con rol válido
 
   if (
@@ -179,7 +206,15 @@ export default function UsersPage() {
 
   const openCreateModal = () => {
     setModalMode('create');
-    setFormData({ name: '', email: '', password: '', role: 'MEMBER', isActive: true });
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'MEMBER',
+      isActive: true,
+      mustChangePassword: true,
+      planId: '',
+    });
     setError('');
     setShowModal(true);
   };
@@ -190,9 +225,11 @@ export default function UsersPage() {
     setFormData({ 
       name: user.name, 
       email: user.email, 
-      password: '', // Password is optional in edit
+      password: '',
       role: user.role, 
-      isActive: user.isActive 
+      isActive: user.isActive,
+      mustChangePassword: user.mustChangePassword,
+      planId: user.subscription?.planId ?? '',
     });
     setError('');
     setShowModal(true);
@@ -205,16 +242,46 @@ export default function UsersPage() {
     
     try {
       if (modalMode === 'create') {
-        await api.post('/users', formData);
+        if (formData.role === 'MEMBER') {
+          if (formData.mustChangePassword) {
+            const { data } = await api.post<{
+              userId: string;
+              temporaryPassword: string;
+            }>('/users/invite', {
+              name: formData.name,
+              email: formData.email,
+              planId: formData.planId || undefined,
+              temporaryPassword: formData.password || undefined,
+            });
+            setCreatedCredentials({
+              name: formData.name,
+              email: formData.email,
+              password: data.temporaryPassword,
+            });
+          } else {
+            await api.post('/users', {
+              ...formData,
+              planId: formData.planId || undefined,
+            });
+          }
+        } else {
+          await api.post('/users', {
+            ...formData,
+            planId: undefined,
+          });
+        }
         showAlert('success', t('common.success'));
       } else {
-        const updateData: Omit<UserFormData, 'password'> & { password?: string } = {
+        const updateData: Record<string, unknown> = {
           name: formData.name,
           email: formData.email,
           role: formData.role,
           isActive: formData.isActive,
-          ...(formData.password ? { password: formData.password } : {}),
+          mustChangePassword: formData.mustChangePassword,
         };
+        if (formData.role === 'MEMBER') {
+          updateData.planId = formData.planId ? formData.planId : null;
+        }
         await api.patch(`/users/${editingUserId}`, updateData);
         showAlert('success', t('common.success'));
       }
@@ -229,6 +296,15 @@ export default function UsersPage() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const generateTemporaryPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let out = '';
+    for (let i = 0; i < 8; i += 1) {
+      out += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setFormData((prev) => ({ ...prev, password: out }));
   };
 
   const toggleStatus = async (userId: string, currentStatus: boolean) => {
@@ -523,19 +599,28 @@ export default function UsersPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('auth.password')} {modalMode === 'edit' && <span className="text-muted-foreground font-normal">(Opcional)</span>}
-                </label>
-                <input 
-                  type="password" 
-                  required={modalMode === 'create'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="w-full h-8 px-3 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
+              {modalMode === 'create' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">{t('auth.password')}</label>
+                  <input
+                    type={formData.role === 'MEMBER' ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full h-8 px-3 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                  />
+                  {formData.role === 'MEMBER' && (
+                    <button
+                      type="button"
+                      onClick={generateTemporaryPassword}
+                      className="mt-2 h-7 px-2 text-xs rounded border border-border hover:bg-muted/40"
+                    >
+                      Generar contraseña temporal
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -548,7 +633,14 @@ export default function UsersPage() {
                       { value: 'GYM_ADMIN', label: 'Admin' },
                     ]}
                     value={formData.role}
-                    onChange={(val) => setFormData({...formData, role: val})}
+                    onChange={(val) =>
+                      setFormData({
+                        ...formData,
+                        role: val,
+                        mustChangePassword:
+                          val === 'MEMBER' ? true : formData.mustChangePassword,
+                      })
+                    }
                   />
                 </div>
 
@@ -564,6 +656,43 @@ export default function UsersPage() {
                   />
                 </div>
               </div>
+
+              {formData.role === 'MEMBER' && (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={formData.mustChangePassword}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          mustChangePassword: e.target.checked,
+                        })
+                      }
+                    />
+                    Forzar cambio de contraseña en primer login
+                  </label>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {modalMode === 'create' ? 'Plan inicial (opcional)' : 'Plan / membresía'}
+                    </label>
+                    <CustomSelect
+                      options={[
+                        { value: '', label: 'Sin plan' },
+                        ...plans.map((p) => ({ value: p.id, label: p.name })),
+                      ]}
+                      value={formData.planId || ''}
+                      onChange={(val) =>
+                        setFormData({
+                          ...formData,
+                          planId: val || '',
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex gap-3">
                 <button 
@@ -582,6 +711,42 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {createdCredentials && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-card w-full max-w-md rounded-xl shadow-2xl border border-border p-4 space-y-3">
+            <h3 className="text-base font-semibold text-foreground">Credenciales generadas</h3>
+            <p className="text-xs text-muted-foreground">
+              Entrega estas credenciales al miembro para su primer ingreso.
+            </p>
+            <div className="text-sm space-y-1">
+              <p><span className="text-muted-foreground">Nombre:</span> {createdCredentials.name}</p>
+              <p><span className="text-muted-foreground">Email:</span> {createdCredentials.email}</p>
+              <p><span className="text-muted-foreground">Contraseña temporal:</span> <span className="font-semibold">{createdCredentials.password}</span></p>
+            </div>
+            <div className="pt-2 flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={async () => {
+                  const text = `Email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}`;
+                  await navigator.clipboard.writeText(text);
+                  showAlert('success', 'Credenciales copiadas');
+                }}
+                className="h-8 px-3 text-xs rounded-md border border-border hover:bg-muted/40"
+              >
+                Copiar credenciales
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreatedCredentials(null)}
+                className="h-8 px-3 text-xs rounded-md bg-primary text-primary-foreground"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

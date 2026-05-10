@@ -8,11 +8,14 @@ import { Request } from 'express';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService) {
     super({
+      // Bearer primero: la app móvil envía siempre el header; si una cookie
+      // `token` vieja o de otra sesión va primero, Passport ignora el Bearer y devuelve 401.
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req: Request) => {
-          return req?.cookies?.token;
-        },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: Request) => {
+          const t = req?.cookies?.token;
+          return typeof t === 'string' && t.length > 0 ? t : null;
+        },
       ]),
       ignoreExpiration: false,
       secretOrKey:

@@ -1,32 +1,71 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateRoutineDto } from './dto/create-routine.dto';
+import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class RoutinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
-  create(
+  async create(
     createRoutineDto: CreateRoutineDto,
     coachId: string,
-    tenantId: string,
+    creatorRole: UserRole,
+    tenantId: string | null,
   ) {
     // Validate JSON content if necessary
     if (
       !createRoutineDto.content ||
       typeof createRoutineDto.content !== 'object'
     ) {
-      throw new Error('Invalid routine content structure');
+      throw new BadRequestException('Estructura de rutina inválida');
+    }
+    const targetUserId =
+      creatorRole === UserRole.MEMBER ? coachId : createRoutineDto.userId;
+    if (!targetUserId) {
+      throw new BadRequestException('userId es obligatorio');
     }
 
-    return this.prisma.routine.create({
+    let resolvedTenantId = tenantId;
+    if (!resolvedTenantId) {
+      const owner = await this.prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { tenantId: true },
+      });
+      resolvedTenantId = owner?.tenantId ?? null;
+    }
+    if (!resolvedTenantId) {
+      throw new BadRequestException('No se pudo determinar el gimnasio del usuario');
+    }
+
+    const routine = await this.prisma.routine.create({
       data: {
         ...createRoutineDto,
+        userId: targetUserId,
         coachId,
-        tenantId,
+        tenantId: resolvedTenantId,
       },
       include: { user: true },
     });
+
+    try {
+      await this.notifications.createAndEmit({
+        userId: targetUserId,
+        tenantId: resolvedTenantId,
+        title: 'Nueva rutina',
+        message: `Nueva rutina asignada: ${routine.name}`,
+        type: 'info',
+        metadata: { routineId: routine.id },
+      });
+    } catch {
+      /* no bloquear creación */
+    }
+
+    return routine;
   }
 
   findAll(tenantId: string) {
@@ -60,14 +99,39 @@ export class RoutinesService {
     });
   }
 
-  update(id: string, data: any) {
+  async update(
+    id: string,
+    data: any,
+    actorId: string,
+    actorRole: UserRole,
+  ) {
+    const routine = await this.prisma.routine.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+    if (!routine) {
+      throw new BadRequestException('Rutina no encontrada');
+    }
+    if (actorRole === UserRole.MEMBER && routine.userId !== actorId) {
+      throw new ForbiddenException('No puedes modificar esta rutina');
+    }
     return this.prisma.routine.update({
       where: { id },
       data,
     });
   }
 
-  remove(id: string) {
+  async remove(id: string, actorId: string, actorRole: UserRole) {
+    const routine = await this.prisma.routine.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+    if (!routine) {
+      throw new BadRequestException('Rutina no encontrada');
+    }
+    if (actorRole === UserRole.MEMBER && routine.userId !== actorId) {
+      throw new ForbiddenException('No puedes eliminar esta rutina');
+    }
     return this.prisma.routine.delete({
       where: { id },
     });

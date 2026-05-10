@@ -5,8 +5,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -28,7 +28,8 @@
     },
     "plugins": [
       "expo-secure-store",
-      "react-native-nfc-manager"
+      "react-native-nfc-manager",
+      "expo-font"
     ]
   }
 }

@@ -10,6 +10,8 @@ import {
   Request,
 } from '@nestjs/common';
 import { PlansService } from './plans.service';
+import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdatePlanDto } from './dto/update-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -22,11 +24,11 @@ export class PlansController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  async create(@Request() req: any, @Body() createPlanDto: any) {
-    const { durationDays, ...rest } = createPlanDto;
+  async create(@Request() req: any, @Body() dto: CreatePlanDto) {
+    const { durationDays, ...rest } = dto;
     const data: Prisma.PlanCreateInput = {
       ...rest,
-      duration: durationDays || rest.duration || 30,
+      duration: durationDays || 30,
       tenant: { connect: { id: req.user.tenantId } },
     };
     return this.plansService.create(data, req.user.sub);
@@ -51,9 +53,9 @@ export class PlansController {
   async update(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() updatePlanDto: any,
+    @Body() dto: UpdatePlanDto,
   ) {
-    const { durationDays, ...rest } = updatePlanDto;
+    const { durationDays, ...rest } = dto;
     const data: Prisma.PlanUpdateInput = {
       ...rest,
     };

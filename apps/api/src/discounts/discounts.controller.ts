@@ -10,21 +10,24 @@ import {
   Request,
 } from '@nestjs/common';
 import { DiscountsService } from './discounts.service';
+import { CreateDiscountDto } from './dto/create-discount.dto';
+import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole, Prisma } from '@prisma/client';
+import { RequireFeature } from '../platform/decorators/require-feature.decorator';
 
 @Controller('discounts')
 export class DiscountsController {
-  // Controller for handling discounts
   constructor(private readonly discountsService: DiscountsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
-  async create(@Request() req: any, @Body() createDiscountDto: any) {
-    const { applicablePlanIds, ...rest } = createDiscountDto;
+  @RequireFeature('discounts')
+  async create(@Request() req: any, @Body() dto: CreateDiscountDto) {
+    const { applicablePlanIds, ...rest } = dto;
 
     const data: Prisma.DiscountCreateInput = {
       ...rest,
@@ -51,9 +54,9 @@ export class DiscountsController {
   async update(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() updateDiscountDto: any,
+    @Body() dto: UpdateDiscountDto,
   ) {
-    const { applicablePlanIds, ...rest } = updateDiscountDto;
+    const { applicablePlanIds, ...rest } = dto;
 
     const data: Prisma.DiscountUpdateInput = {
       ...rest,

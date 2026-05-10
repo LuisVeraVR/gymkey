@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { NotificationsController } from './notifications.controller';
 
 @Global()
 @Module({
@@ -18,6 +19,7 @@ import { NotificationsService } from './notifications.service';
       inject: [ConfigService],
     }),
   ],
+  controllers: [NotificationsController],
   providers: [NotificationsGateway, NotificationsService],
   exports: [NotificationsService, NotificationsGateway],
 })

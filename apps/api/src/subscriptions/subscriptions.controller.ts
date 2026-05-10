@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -43,5 +44,14 @@ export class SubscriptionsController {
   @Get('my-subscription')
   getMySubscription(@Request() req: any) {
     return this.subscriptionsService.findByUser(req.user.userId);
+  }
+
+  @Get('history')
+  getHistory(
+    @Request() req: any,
+    @Query('userId') userId?: string,
+  ) {
+    const targetUserId = userId || req.user.userId;
+    return this.subscriptionsService.findHistoryByUser(targetUserId);
   }
 }

@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { CheckLimit } from '../platform/decorators/check-limit.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('routines')
@@ -22,11 +23,13 @@ export class RoutinesController {
   constructor(private readonly routinesService: RoutinesService) {}
 
   @Post()
-  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH)
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH, UserRole.MEMBER)
+  @CheckLimit('maxRoutines')
   create(@Request() req: any, @Body() createRoutineDto: CreateRoutineDto) {
     return this.routinesService.create(
       createRoutineDto,
       req.user.id,
+      req.user.role,
       req.user.tenantId,
     );
   }
@@ -60,14 +63,14 @@ export class RoutinesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH)
-  update(@Param('id') id: string, @Body() updateRoutineDto: any) {
-    return this.routinesService.update(id, updateRoutineDto);
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH, UserRole.MEMBER)
+  update(@Request() req: any, @Param('id') id: string, @Body() updateRoutineDto: any) {
+    return this.routinesService.update(id, updateRoutineDto, req.user.id, req.user.role);
   }
 
   @Delete(':id')
-  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH)
-  remove(@Param('id') id: string) {
-    return this.routinesService.remove(id);
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN, UserRole.COACH, UserRole.MEMBER)
+  remove(@Request() req: any, @Param('id') id: string) {
+    return this.routinesService.remove(id, req.user.id, req.user.role);
   }
 }

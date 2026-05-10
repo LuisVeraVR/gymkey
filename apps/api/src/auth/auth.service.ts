@@ -44,25 +44,20 @@ export class AuthService {
       };
     }
 
-    // Check MFA status
+    // MFA por correo/teléfono aún no está implementado realmente en esta app.
+    // Para no romper el acceso, desactivamos la exigencia operativa hasta tener
+    // esos canales disponibles.
     if (user.mfaEnabled) {
-      return {
-        mfaRequired: true,
-        tempToken: this.jwtService.sign(tempPayload, { expiresIn: '5m' }),
-        user: { id: user.id, email: user.email, role: user.role },
-      };
+      return this.loginWithMfa({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+      });
     }
 
-    // If MFA is not enabled, check skip count
-    if ((user.mfaSkipCount || 0) >= 3) {
-      return {
-        mfaSetupRequired: true,
-        tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
-        user: { id: user.id, email: user.email, role: user.role },
-      };
-    }
-
-    // Suggest MFA but allow skipping (still return temp token so they MUST call skip endpoint)
+    // Mientras no exista un flujo real de MFA por correo/teléfono para mobile,
+    // no bloqueamos el acceso exigiendo configuración web.
     return {
       mfaSetupSuggested: true,
       tempToken: this.jwtService.sign(tempPayload, { expiresIn: '15m' }),
@@ -71,15 +66,31 @@ export class AuthService {
   }
 
   async changePassword(userId: string, newPassword: string) {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    // Cast to any because TS might not know about mustChangePassword yet in the update input type
+    // Dejar el hash en UsersService.update (una sola pasada de bcrypt).
     await this.usersService.update(userId, {
-      password: hashedPassword,
+      password: newPassword,
       mustChangePassword: false,
     } as any);
 
     const user = await this.usersService.findById(userId);
-    return this.login(user);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
+    const loginResult = await this.login(user);
+    if (
+      loginResult &&
+      typeof loginResult === 'object' &&
+      'mfaSetupSuggested' in loginResult &&
+      (loginResult as { mfaSetupSuggested?: boolean }).mfaSetupSuggested ===
+        true
+    ) {
+      await this.skipMfa(userId);
+      return this.loginWithMfa({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+      });
+    }
+    return loginResult;
   }
 
   async generateMfaSecret(userId: string) {

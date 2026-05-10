@@ -9,7 +9,7 @@ export class CreateRoutineDto {
   @IsObject()
   content: any; // JSON structure for exercises
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  userId: string;
+  userId?: string;
 }

@@ -21,6 +21,42 @@ export class SettingsService {
     });
   }
 
+  async getRuntimeConfig(tenantId: string) {
+    if (!tenantId) {
+      return {
+        name: 'GymKey',
+        offlineToleranceMinutes: 5,
+        showPublicPortal: false,
+        branding: null,
+      };
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, config: true },
+    });
+
+    const cfg = (tenant?.config as Record<string, unknown> | null) || {};
+    return {
+      name:
+        typeof tenant?.name === 'string' && tenant.name.trim()
+          ? tenant.name
+          : 'GymKey',
+      offlineToleranceMinutes:
+        typeof cfg.offlineToleranceMinutes === 'number'
+          ? cfg.offlineToleranceMinutes
+          : 5,
+      showPublicPortal:
+        typeof cfg.showPublicPortal === 'boolean'
+          ? cfg.showPublicPortal
+          : Boolean(cfg.allowPublicRegistration),
+      branding:
+        cfg.branding && typeof cfg.branding === 'object'
+          ? cfg.branding
+          : null,
+    };
+  }
+
   async updateSettings(
     tenantId: string,
     updateSettingsDto: UpdateSettingsDto,

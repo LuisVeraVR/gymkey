@@ -20,6 +20,22 @@ enum SubscriptionStatus {
   PAST_DUE
   SUSPENDED
   CANCELED
+  EXPIRED
+}
+
+enum PlatformPlan {
+  DEMO
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum PlatformSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
 }
 
 enum CheckinStatus {
@@ -28,50 +44,127 @@ enum CheckinStatus {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  config    Json?    // Custom configurations like grace period
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  config           Json? // Custom configurations like grace period
+  billingAccountId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  billingAccount PlatformBillingAccount? @relation(fields: [billingAccountId], references: [id])
+  users          User[]
+  plans          Plan[]
+  discounts      Discount[]
+  routines       Routine[]
+  gymClasses     GymClass[]
+  classBookings  ClassBooking[]
+  auditLogs      AuditLog[]
+  checkins       Checkin[]
+  payments       Payment[]
+  notifications  Notification[]
+}
+
+model PlatformBillingAccount {
+  id           String                     @id @default(uuid())
+  name         String
+  email        String?
+  plan         PlatformPlan               @default(DEMO)
+  status       PlatformSubscriptionStatus @default(ACTIVE)
+  hasUsedTrial Boolean                    @default(false)
+  tenantLimit  Int                        @default(1)
+
+  trialStartDate DateTime?
+  trialEndDate   DateTime?
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  externalCustomerId     String?
+  externalSubscriptionId String?
+
+  canceledAt DateTime?
+
+  tenants      Tenant[]
+  subscription PlatformSubscription?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
 
-  users         User[]
-  plans         Plan[]
-  discounts     Discount[]
-  routines      Routine[]
-  auditLogs     AuditLog[]
-  checkins      Checkin[]
-  payments      Payment[]
+model PlatformSubscription {
+  id String @id @default(uuid())
+
+  billingAccountId String                 @unique
+  billingAccount   PlatformBillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  plan   PlatformPlan               @default(DEMO)
+  status PlatformSubscriptionStatus @default(ACTIVE)
+
+  trialStartDate DateTime?
+  trialEndDate   DateTime?
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  externalCustomerId     String?
+  externalSubscriptionId String?
+
+  canceledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  photo     String?
-  role      UserRole @default(MEMBER)
-  isActive  Boolean  @default(true)
-  
+  id       String   @id @default(uuid())
+  email    String   @unique
+  password String
+  name     String?
+  photo    String?
+  role     UserRole @default(MEMBER)
+  isActive Boolean  @default(true)
+
   // MFA fields
   mfaSecret    String?
-  mfaEnabled   Boolean  @default(false)
-  mfaSkipCount Int      @default(0)
-  
-  mustChangePassword Boolean @default(false)
-  
-  tenantId  String?
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  mfaEnabled   Boolean @default(false)
+  mfaSkipCount Int     @default(0)
 
-  subscription  Subscription?
+  mustChangePassword Boolean @default(false)
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
+  subscriptions Subscription[]
   accessKey     AccessKey?
   checkins      Checkin[]
   routines      Routine[] // Routines assigned to this user
+  coachClasses  GymClass[]     @relation("CoachClasses")
+  classBookings ClassBooking[]
   auditLogs     AuditLog[] // Actions performed by this user
   payments      Payment[]
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id      String  @id @default(uuid())
+  title   String
+  message String
+  type    String  @default("info")
+  read    Boolean @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
 }
 
 model Plan {
@@ -79,14 +172,14 @@ model Plan {
   name        String
   type        String   @default("Mensual")
   price       Decimal
-  duration    Int      // In days
+  duration    Int // In days
   description String?
   active      Boolean  @default(true)
   features    String[] // Array of strings for features
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
   subscriptions Subscription[]
   discounts     Discount[]
 
@@ -95,18 +188,18 @@ model Plan {
 }
 
 model Discount {
-  id        String   @id @default(uuid())
-  name      String
-  type      String   // 'PERCENTAGE' | 'FIXED'
-  value     Decimal
-  code      String
-  active    Boolean  @default(true)
-  
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  
-  plans     Plan[]
-  
+  id     String  @id @default(uuid())
+  name   String
+  type   String // 'PERCENTAGE' | 'FIXED'
+  value  Decimal
+  code   String
+  active Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  plans Plan[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -114,18 +207,19 @@ model Discount {
 }
 
 model Subscription {
-  id        String             @id @default(uuid())
-  userId    String             @unique
-  user      User               @relation(fields: [userId], references: [id])
-  
-  planId    String
-  plan      Plan               @relation(fields: [planId], references: [id])
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
 
   status    SubscriptionStatus @default(ACTIVE)
+  isCurrent Boolean            @default(true)
   startDate DateTime           @default(now())
   endDate   DateTime
-  
-  payments  Payment[]
+
+  payments Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,21 +230,21 @@ model Payment {
   amount        Decimal
   currency      String        @default("USD")
   status        PaymentStatus @default(PENDING)
-  method        String        // CARD, CASH, TRANSFER, ETC
-  provider      String?       // STRIPE, MERCADOPAGO, MANUAL
-  transactionId String?       // External ID
+  method        String // CARD, CASH, TRANSFER, ETC
+  provider      String? // STRIPE, MERCADOPAGO, MANUAL
+  transactionId String? // External ID
 
-  userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
   subscriptionId String?
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
-  tenantId      String
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum PaymentStatus {
@@ -161,58 +255,101 @@ enum PaymentStatus {
 }
 
 model AccessKey {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  
-  token     String?  // Current valid token hash or similar
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  token     String? // Current valid token hash or similar
   expiresAt DateTime?
 
   updatedAt DateTime @updatedAt
 }
 
 model Checkin {
-  id        String        @id @default(uuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  
-  tenantId  String
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  status    CheckinStatus
-  method    String        @default("QR") // QR, MANUAL, ETC
-  details   String?       // Reason for denial etc.
-  
-  timestamp DateTime      @default(now())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  status  CheckinStatus
+  method  String        @default("QR") // QR, MANUAL, ETC
+  details String? // Reason for denial etc.
+
+  timestamp DateTime @default(now())
 }
 
 model Routine {
-  id        String   @id @default(uuid())
-  name      String
-  content   Json     // Structure of the routine (exercises, sets, reps)
-  
-  userId    String   // Assigned to
-  user      User     @relation(fields: [userId], references: [id])
-  
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  
-  coachId   String?  // Created by
-  
+  id      String @id @default(uuid())
+  name    String
+  content Json // Structure of the routine (exercises, sets, reps)
+
+  userId String // Assigned to
+  user   User   @relation(fields: [userId], references: [id])
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  coachId String? // Created by
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model GymClass {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  coachId String
+  coach   User   @relation("CoachClasses", fields: [coachId], references: [id])
+
+  capacity  Int
+  duration  Int // Minutes
+  dayOfWeek Int[] // 0=Sun, 1=Mon, ... 6=Sat
+  startTime String // "07:00"
+  active    Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  bookings ClassBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ClassBooking {
+  id String @id @default(uuid())
+
+  classId  String
+  gymClass GymClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  date   DateTime
+  status String   @default("CONFIRMED") // CONFIRMED, CANCELED, ATTENDED, NO_SHOW
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([classId, userId, date])
+}
+
 model AuditLog {
-  id        String   @id @default(uuid())
-  action    String
-  details   Json?
-  
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  
-  tenantId  String?
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
-  
+  id      String @id @default(uuid())
+  action  String
+  details Json?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
   timestamp DateTime @default(now())
 }

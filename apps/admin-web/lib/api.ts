@@ -11,7 +11,10 @@ api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     // We try to get token from cookie just in case, but HttpOnly cookies are handled by browser
     const token = Cookies.get('token');
-    if (token) {
+    const hasAuthorizationHeader =
+      typeof config.headers?.Authorization === 'string' &&
+      config.headers.Authorization.trim().length > 0;
+    if (token && !hasAuthorizationHeader) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }

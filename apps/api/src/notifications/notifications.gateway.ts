@@ -45,16 +45,26 @@ export class NotificationsGateway
         return;
       }
 
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify(token) as {
+        sub?: string;
+        tenantId?: string | null;
+      };
+
+      if (payload.sub) {
+        await client.join(payload.sub);
+        this.logger.log(
+          `Client ${client.id} joined user room: ${payload.sub}`,
+        );
+      }
 
       if (payload.tenantId) {
         await client.join(payload.tenantId);
         this.logger.log(
           `Client ${client.id} joined tenant room: ${payload.tenantId}`,
         );
-      } else {
+      } else if (!payload.sub) {
         this.logger.warn(
-          `Client ${client.id} authenticated but has no tenantId`,
+          `Client ${client.id} authenticated but has no sub/tenantId`,
         );
       }
     } catch (e) {
@@ -72,5 +82,9 @@ export class NotificationsGateway
 
   sendToTenant(tenantId: string, event: string, data: any) {
     this.server.to(tenantId).emit(event, data);
+  }
+
+  sendToUser(userId: string, event: string, data: unknown) {
+    this.server.to(userId).emit(event, data);
   }
 }

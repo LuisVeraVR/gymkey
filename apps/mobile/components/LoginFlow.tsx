@@ -1,19 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import axios from 'axios';
 import { API_BASE_URL, authClient } from '../api';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius, fontSize } from '../theme';
+import { Text } from './ui/Text';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { OtpInput } from './ui/OtpInput';
+import { PasswordStrength } from './ui/PasswordStrength';
+
+/* ─── Types ───────────────────────────── */
 
 type PostLogin =
   | 'done'
@@ -21,63 +38,76 @@ type PostLogin =
   | { step: 'password'; tempToken: string }
   | { step: 'mfaSetup'; tempToken: string };
 
-type Mode = 'light' | 'dark';
 type AuthScreen = 'welcome' | 'login' | 'forgot';
+type ActiveView = AuthScreen | 'mfa' | 'password';
+type ThemeColors = ReturnType<typeof useTheme>['colors'];
 
-type Palette = {
-  bg: string;
-  surface: string;
-  surfaceAlt: string;
-  text: string;
-  muted: string;
-  border: string;
-  primary: string;
-  primaryText: string;
-  danger: string;
+/* ─── Layout constants ────────────────── */
+
+const BLEND_ZONE = 80;
+const CARD_OVERLAP = 48;
+const CARD_RADIUS = radius['2xl'];
+
+const HERO_IMAGES: Record<ActiveView, string> = {
+  welcome:
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+  login:
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200&auto=format&fit=crop',
+  forgot:
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200&auto=format&fit=crop',
+  mfa:
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200&auto=format&fit=crop',
+  password:
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200&auto=format&fit=crop',
 };
 
-function getPalette(mode: Mode): Palette {
-  if (mode === 'dark') {
-    return {
-      bg: '#030303',
-      surface: '#111113',
-      surfaceAlt: '#18181b',
-      text: '#f5f5f5',
-      muted: '#a1a1aa',
-      border: '#27272a',
-      primary: '#10b981',
-      primaryText: '#ffffff',
-      danger: '#f87171',
-    };
-  }
+const HERO_CONTENT: Record<ActiveView, { title: string; subtitle: string; fraction: number }> = {
+  welcome: {
+    title: 'Tu gimnasio,\nsiempre contigo',
+    subtitle: 'Acceso, rutinas, pagos y más en una sola app.',
+    fraction: 0.38,
+  },
+  login: {
+    title: 'Bienvenido\nde vuelta',
+    subtitle: 'QR, rutinas, clases y pagos en un solo lugar.',
+    fraction: 0.32,
+  },
+  forgot: {
+    title: 'Recupera tu\nacceso',
+    subtitle: 'Te enviaremos instrucciones por correo.',
+    fraction: 0.30,
+  },
+  mfa: {
+    title: 'Verificación',
+    subtitle: 'Un paso más para proteger tu cuenta.',
+    fraction: 0.28,
+  },
+  password: {
+    title: 'Nueva contraseña',
+    subtitle: 'Por seguridad, crea una contraseña nueva.',
+    fraction: 0.28,
+  },
+};
 
-  return {
-    bg: '#f8fafc',
-    surface: '#ffffff',
-    surfaceAlt: '#f1f5f9',
-    text: '#0f172a',
-    muted: '#64748b',
-    border: '#e2e8f0',
-    primary: '#10b981',
-    primaryText: '#ffffff',
-    danger: '#ef4444',
-  };
-}
+/* ─── Pure helpers ─────────────────────── */
 
 function formatAuthError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     if (!err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
-      return `Sin conexión con el servidor (${API_BASE_URL}). ¿La API está en marcha y el puerto coincide con EXPO_PUBLIC_API_PORT / PORT?`;
+      return `Sin conexión con el servidor (${API_BASE_URL}). ¿La API está en marcha?`;
     }
     const data = err.response?.data;
     if (data && typeof data === 'object' && 'message' in data) {
       const m = (data as { message: unknown }).message;
-      if (typeof m === 'string') return m;
+      if (typeof m === 'string') {
+        if (m === 'Unauthorized') {
+          return 'Sesión no válida o expirada. Si abriste el admin en este dispositivo, cierra sesión allí y vuelve a entrar.';
+        }
+        return m;
+      }
       if (Array.isArray(m)) return m.filter((x) => typeof x === 'string').join(', ');
     }
-    if (err.response?.status === 401) {
-      return 'Credenciales inválidas';
-    }
+    if (err.response?.status === 401) return 'Credenciales inválidas';
     return err.message || 'Error al iniciar sesión';
   }
   if (err instanceof Error) return err.message;
@@ -88,130 +118,230 @@ async function consumeLoginPayload(
   data: Record<string, unknown>,
   signIn: (t: string) => Promise<void>,
 ): Promise<PostLogin> {
-  if (typeof data.access_token === 'string') {
-    await signIn(data.access_token);
-    return 'done';
-  }
-  if (data.passwordChangeRequired && typeof data.tempToken === 'string') {
-    return { step: 'password', tempToken: data.tempToken };
-  }
-  if (data.mfaRequired && typeof data.tempToken === 'string') {
-    return { step: 'mfa', tempToken: data.tempToken };
-  }
-  if (data.mfaSetupRequired && typeof data.tempToken === 'string') {
-    return { step: 'mfaSetup', tempToken: data.tempToken };
-  }
-  if (data.mfaSetupSuggested && typeof data.tempToken === 'string') {
+  const trySkipMfaSetup = async (tempToken: string) => {
     const r = await authClient.post(
       '/auth/mfa/skip',
       {},
-      { headers: { Authorization: `Bearer ${data.tempToken}` } },
+      { headers: { Authorization: `Bearer ${tempToken}` } },
     );
     const at = r.data?.access_token;
     if (typeof at === 'string') {
       await signIn(at);
-      return 'done';
+      return 'done' as const;
     }
-    throw new Error('Sin access_token tras omitir MFA');
+    throw new Error('Sin access_token tras continuar sin MFA');
+  };
+
+  if (typeof data.access_token === 'string') {
+    await signIn(data.access_token);
+    return 'done';
+  }
+  if (data.passwordChangeRequired && typeof data.tempToken === 'string')
+    return { step: 'password', tempToken: data.tempToken };
+  if (data.mfaRequired && typeof data.tempToken === 'string')
+    return { step: 'mfa', tempToken: data.tempToken };
+  if (data.mfaSetupRequired && typeof data.tempToken === 'string') {
+    return trySkipMfaSetup(data.tempToken);
+  }
+  if (data.mfaSetupSuggested && typeof data.tempToken === 'string') {
+    return trySkipMfaSetup(data.tempToken);
   }
   throw new Error('Respuesta de login inesperada');
 }
 
-function InputRow({
-  icon,
-  iconColor,
-  children,
+function computeHeroHeight(screenH: number, fraction: number, insetsTop: number) {
+  return Math.max(240, Math.min(screenH * fraction, 340)) + BLEND_ZONE + insetsTop;
+}
+
+/* ─── Sub-components ──────────────────── */
+
+function HeroPanel({
+  image, title, subtitle, colors, fraction,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  iconColor: string;
-  children: React.ReactNode;
+  image: string; title: string; subtitle: string; colors: ThemeColors; fraction: number;
 }) {
+  const { height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const heroH = computeHeroHeight(screenH, fraction, insets.top);
+
   return (
-    <View style={stylesStatic.inputRow}>
-      <Ionicons name={icon} size={17} color={iconColor} />
-      <View style={stylesStatic.inputFill}>{children}</View>
+    <View style={{ height: heroH, width: '100%' }}>
+      <ImageBackground source={{ uri: image }} style={{ flex: 1, backgroundColor: '#18181b' }} resizeMode="cover">
+        <LinearGradient
+          colors={[`${colors.primary}30`, 'transparent']}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(24,24,27,0.05)', 'rgba(9,9,11,0.72)', 'rgba(9,9,11,0.95)']}
+          locations={[0.1, 0.5, 0.85]}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['transparent', colors.background]}
+          locations={[0, 0.5]}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: BLEND_ZONE + 24 }}
+        />
+
+        <View style={{ flex: 1, justifyContent: 'flex-end', paddingHorizontal: spacing.xl, paddingBottom: BLEND_ZONE + spacing.md, paddingTop: insets.top + spacing.lg }}>
+          <Animated.View entering={FadeIn.delay(80).duration(450)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg }}>
+            <View style={{ width: 38, height: 38, borderRadius: radius.md, backgroundColor: `${colors.primary}E6`, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="key" size={20} color="#fafafa" />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text variant="h3" style={{ color: '#fafafa', letterSpacing: -0.3 }}>Gym</Text>
+              <Text variant="h3" style={{ color: colors.primary, letterSpacing: -0.3 }}>Key</Text>
+            </View>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(200).duration(450)}>
+            <Text variant="h1" style={{ color: '#fafafa', lineHeight: fontSize['3xl'] * 1.18, letterSpacing: -0.6, marginBottom: spacing.xs }}>
+              {title}
+            </Text>
+          </Animated.View>
+          <Animated.View entering={FadeInDown.delay(340).duration(400)}>
+            <Text variant="body" style={{ color: 'rgba(244,244,245,0.78)', lineHeight: 22 }}>{subtitle}</Text>
+          </Animated.View>
+        </View>
+      </ImageBackground>
     </View>
   );
 }
 
-const stylesStatic = StyleSheet.create({
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  inputFill: {
-    flex: 1,
-  },
-});
-
-function ScreenShell({
-  mode,
-  onToggleMode,
-  title,
-  subtitle,
-  contentAnimatedStyle,
-  children,
+function CardSheet({
+  colors, isDark, minHeight, children,
 }: {
-  mode: Mode;
-  onToggleMode: () => void;
-  title: string;
-  subtitle: string;
-  contentAnimatedStyle?: object;
-  children: React.ReactNode;
+  colors: ThemeColors; isDark: boolean; minHeight: number; children: React.ReactNode;
 }) {
-  const palette = getPalette(mode);
-  const styles = useMemo(() => makeStyles(palette), [palette]);
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.wrapper}>
-        <View style={styles.headerRow}>
-          <View style={styles.brandWrap}>
-            <View style={styles.brandIconWrap}>
-              <Ionicons name="barbell-outline" size={18} color={palette.primary} />
-            </View>
-            <View>
-              <Text style={styles.brand}>GymKey</Text>
-              <Text style={styles.brandSub}>Tu gimnasio en el móvil</Text>
-            </View>
-          </View>
-          <Pressable
-            style={({ pressed }) => [styles.modeBtn, pressed && styles.pressScale]}
-            onPress={onToggleMode}
-          >
-            <Ionicons
-              name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
-              size={18}
-              color={palette.text}
-            />
-          </Pressable>
-        </View>
-
-        <Animated.View style={[styles.card, contentAnimatedStyle]}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-          <View style={styles.formBlock}>{children}</View>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
+    <Animated.View
+      entering={FadeInUp.delay(420).duration(500).springify().damping(20)}
+      style={{
+        backgroundColor: colors.background,
+        borderTopLeftRadius: CARD_RADIUS,
+        borderTopRightRadius: CARD_RADIUS,
+        marginTop: -CARD_OVERLAP,
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing['2xl'],
+        paddingBottom: spacing['5xl'],
+        minHeight,
+        shadowColor: isDark ? '#000' : colors.shadowColor,
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: isDark ? 0.5 : 0.08,
+        shadowRadius: 20,
+        elevation: 12,
+      }}
+    >
+      {children}
+    </Animated.View>
   );
 }
 
-export function LoginFlow({ onLogin }: { onLogin: (t: string) => Promise<void> }) {
-  const [mode, setMode] = useState<Mode>('light');
-  const [screen, setScreen] = useState<AuthScreen>('welcome');
-  const palette = getPalette(mode);
-  const styles = useMemo(() => makeStyles(palette), [palette]);
+function FloatingThemeToggle({ toggleMode, isDark }: { toggleMode: () => void; isDark: boolean }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Pressable
+      onPress={toggleMode}
+      accessibilityLabel="Cambiar tema"
+      accessibilityRole="button"
+      style={{
+        position: 'absolute', top: insets.top + spacing.sm, right: spacing.xl, zIndex: 30,
+        width: 40, height: 40, borderRadius: 20,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(24,24,27,0.5)',
+        justifyContent: 'center', alignItems: 'center',
+      }}
+    >
+      <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={18} color="#fafafa" />
+    </Pressable>
+  );
+}
 
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const { colors } = useTheme();
+  useEffect(() => { const t = setTimeout(onDismiss, 5000); return () => clearTimeout(t); }, [onDismiss]);
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(250)}
+      exiting={FadeOut.duration(200)}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+        backgroundColor: colors.destructiveSurface, borderWidth: 1,
+        borderColor: colors.destructive + '44', borderRadius: radius.md,
+        paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+      }}
+    >
+      <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+      <Text variant="caption" color={colors.destructive} style={{ flex: 1 }}>{message}</Text>
+      <Pressable onPress={onDismiss} hitSlop={8}>
+        <Ionicons name="close" size={16} color={colors.destructive} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function WelcomeFeatureRow({ icon, label, colors }: { icon: keyof typeof Ionicons.glyphMap; label: string; colors: ThemeColors }) {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border,
+      borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    }}>
+      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySurface, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={18} color={colors.primary} />
+      </View>
+      <Text variant="body" weight="medium">{label}</Text>
+    </View>
+  );
+}
+
+/* ─── Screen shell (no theme toggle — lives outside) */
+
+function ScreenShell({
+  view, colors, isDark, children,
+}: {
+  view: ActiveView; colors: ThemeColors; isDark: boolean; children: React.ReactNode;
+}) {
+  const { height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const hero = HERO_CONTENT[view];
+  const heroH = computeHeroHeight(screenH, hero.fraction, insets.top);
+  const cardMinH = screenH - heroH + CARD_OVERLAP + insets.bottom;
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <HeroPanel image={HERO_IMAGES[view]} title={hero.title} subtitle={hero.subtitle} colors={colors} fraction={hero.fraction} />
+        <CardSheet colors={colors} isDark={isDark} minHeight={cardMinH}>
+          {children}
+        </CardSheet>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+/* ─── Main ─────────────────────────────── */
+
+export function LoginFlow({ onLogin }: { onLogin: (t: string) => Promise<void> }) {
+  const OTP_LENGTH = 6;
+  const { colors, toggleMode, isDark } = useTheme();
+
+  const [screen, setScreen] = useState<AuthScreen>('welcome');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
+  const [mfaCountdown, setMfaCountdown] = useState(300);
 
   const [pwdTemp, setPwdTemp] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -220,700 +350,256 @@ export function LoginFlow({ onLogin }: { onLogin: (t: string) => Promise<void> }
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  const cardAnim = useRef(new Animated.Value(1)).current;
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    cardAnim.setValue(0);
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 260,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [screen, mfaToken, pwdTemp, cardAnim]);
+    if (mfaToken) {
+      setMfaCountdown(300);
+      countdownRef.current = setInterval(() => {
+        setMfaCountdown((v) => {
+          if (v <= 1) { if (countdownRef.current) clearInterval(countdownRef.current); return 0; }
+          return v - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [mfaToken]);
 
-  const contentAnimatedStyle = {
-    opacity: cardAnim,
-    transform: [
-      {
-        translateY: cardAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [14, 0],
-        }),
-      },
-    ],
-  };
-
-  const resetAuthFlows = () => {
-    setMfaToken(null);
-    setPwdTemp(null);
-    setOtp('');
-    setNewPassword('');
-    setNewPassword2('');
-  };
-
-  const onToggleMode = () => setMode((m) => (m === 'light' ? 'dark' : 'light'));
+  const resetAuthFlows = useCallback(() => {
+    setMfaToken(null); setPwdTemp(null); setOtp('');
+    setNewPassword(''); setNewPassword2(''); setError('');
+  }, []);
 
   const handleCredentials = async () => {
-    if (!email.includes('@')) {
-      setError('Ingresa un correo válido');
-      return;
-    }
-    if (!password) {
-      setError('Ingresa tu contraseña');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
+    if (!email.includes('@')) { setError('Ingresa un correo válido'); return; }
+    if (!password) { setError('Ingresa tu contraseña'); return; }
+    setLoading(true); setError('');
     try {
       const { data } = await authClient.post('/auth/login', { email, password });
       const next = await consumeLoginPayload(data, onLogin);
       if (next === 'done') return;
       if (next.step === 'mfa') setMfaToken(next.tempToken);
       else if (next.step === 'password') setPwdTemp(next.tempToken);
-      else if (next.step === 'mfaSetup') {
-        Alert.alert(
-          'Configurar MFA',
-          'Tu cuenta requiere activar MFA. Hazlo desde la web o contacta al staff.',
-        );
-        resetAuthFlows();
-      }
     } catch (e) {
       setError(formatAuthError(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!forgotEmail.includes('@')) {
-      setError('Ingresa un correo válido');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    try {
-      await authClient.post('/auth/forgot-password', { email: forgotEmail });
-      setForgotSent(true);
-    } catch {
-      setError('No se pudo enviar el correo de recuperación');
-    } finally {
-      setLoading(false);
-    }
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally { setLoading(false); }
   };
 
   const handleMfaVerify = async () => {
     if (!mfaToken) return;
-
-    setLoading(true);
-    setError('');
+    const token = otp.replace(/\D/g, '');
+    if (token.length !== OTP_LENGTH) { setError('Ingresa los 6 dígitos'); return; }
+    setLoading(true); setError('');
     try {
-      const { data } = await authClient.post(
-        '/auth/mfa/verify-login',
-        { token: otp },
-        { headers: { Authorization: `Bearer ${mfaToken}` } },
-      );
-      if (typeof data.access_token === 'string') {
-        await onLogin(data.access_token);
-        resetAuthFlows();
-      } else {
-        setError('No se recibió token');
-      }
-    } catch {
-      setError('Código incorrecto');
-    } finally {
-      setLoading(false);
-    }
+      const { data } = await authClient.post('/auth/mfa/verify-login', { token }, { headers: { Authorization: `Bearer ${mfaToken}` } });
+      if (typeof data.access_token === 'string') { await onLogin(data.access_token); resetAuthFlows(); }
+      else setError('No se recibió token');
+    } catch { setError('Código incorrecto'); }
+    finally { setLoading(false); }
   };
 
   const handlePasswordChange = async () => {
-    if (newPassword.length < 8) {
-      setError('Mínimo 8 caracteres');
-      return;
-    }
-    if (newPassword !== newPassword2) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
+    if (newPassword.length < 8) { setError('Mínimo 8 caracteres'); return; }
+    if (newPassword !== newPassword2) { setError('Las contraseñas no coinciden'); return; }
     if (!pwdTemp) return;
-
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const { data } = await authClient.post(
-        '/auth/change-password',
-        { password: newPassword },
-        { headers: { Authorization: `Bearer ${pwdTemp}` } },
-      );
+      const { data } = await authClient.post('/auth/change-password', { password: newPassword }, { headers: { Authorization: `Bearer ${pwdTemp}` } });
       const next = await consumeLoginPayload(data, onLogin);
-      if (next === 'done') {
-        resetAuthFlows();
-        return;
-      }
-      if (next.step === 'mfa') {
-        setPwdTemp(null);
-        setMfaToken(next.tempToken);
-      }
-    } catch {
-      setError('No se pudo actualizar la contraseña');
-    } finally {
-      setLoading(false);
-    }
+      if (next === 'done') { resetAuthFlows(); return; }
+      if (next.step === 'mfa') { setPwdTemp(null); setMfaToken(next.tempToken); }
+    } catch (e) {
+      setError(formatAuthError(e));
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally { setLoading(false); }
   };
 
-  if (mfaToken) {
-    return (
-      <ScreenShell
-        mode={mode}
-        onToggleMode={onToggleMode}
-        title="Verificación en dos pasos"
-        subtitle="Ingresa el código de tu app autenticadora"
-        contentAnimatedStyle={contentAnimatedStyle}
-      >
-        <InputRow icon="shield-checkmark-outline" iconColor={palette.muted}>
-          <TextInput
-            style={styles.input}
-            placeholder="Código de 6 dígitos"
-            placeholderTextColor={palette.muted}
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="number-pad"
-            maxLength={8}
-          />
-        </InputRow>
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.includes('@')) { setError('Ingresa un correo válido'); return; }
+    setLoading(true); setError('');
+    try { await authClient.post('/auth/forgot-password', { email: forgotEmail }); setForgotSent(true); }
+    catch { setError('No se pudo enviar el correo de recuperación'); }
+    finally { setLoading(false); }
+  };
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+  const fmtCountdown = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  const activeView: ActiveView = mfaToken ? 'mfa' : pwdTemp ? 'password' : screen;
 
-        <Pressable
-          style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-          onPress={handleMfaVerify}
-        >
-          {loading ? (
-            <ActivityIndicator color={palette.primaryText} />
-          ) : (
-            <View style={styles.btnInner}>
-              <Ionicons name="arrow-forward" size={16} color={palette.primaryText} />
-              <Text style={styles.primaryBtnText}>Continuar</Text>
-            </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.textBtn, pressed && styles.textBtnPressed]}
-          onPress={() => {
-            resetAuthFlows();
-            setError('');
-          }}
-        >
-          <Text style={styles.textBtnLabel}>Volver al login</Text>
-        </Pressable>
-      </ScreenShell>
-    );
-  }
-
-  if (pwdTemp) {
-    return (
-      <ScreenShell
-        mode={mode}
-        onToggleMode={onToggleMode}
-        title="Actualiza tu contraseña"
-        subtitle="Por seguridad, debes crear una nueva"
-        contentAnimatedStyle={contentAnimatedStyle}
-      >
-        <InputRow icon="lock-closed-outline" iconColor={palette.muted}>
-          <TextInput
-            style={styles.input}
-            placeholder="Nueva contraseña"
-            placeholderTextColor={palette.muted}
-            value={newPassword}
-            onChangeText={setNewPassword}
-            secureTextEntry
-          />
-        </InputRow>
-
-        <InputRow icon="checkmark-circle-outline" iconColor={palette.muted}>
-          <TextInput
-            style={styles.input}
-            placeholder="Repetir contraseña"
-            placeholderTextColor={palette.muted}
-            value={newPassword2}
-            onChangeText={setNewPassword2}
-            secureTextEntry
-          />
-        </InputRow>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <Pressable
-          style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-          onPress={handlePasswordChange}
-        >
-          {loading ? (
-            <ActivityIndicator color={palette.primaryText} />
-          ) : (
-            <View style={styles.btnInner}>
-              <Ionicons name="save-outline" size={16} color={palette.primaryText} />
-              <Text style={styles.primaryBtnText}>Guardar</Text>
-            </View>
-          )}
-        </Pressable>
-      </ScreenShell>
-    );
-  }
-
-  if (screen === 'forgot') {
-    return (
-      <ScreenShell
-        mode={mode}
-        onToggleMode={onToggleMode}
-        title="Recuperar contraseña"
-        subtitle="Te enviaremos instrucciones por correo"
-        contentAnimatedStyle={contentAnimatedStyle}
-      >
-        <View style={styles.forgotStack}>
-          <View style={[styles.passwordRow, styles.inputRowNoTopMargin]}>
-            <Ionicons name="mail-outline" size={17} color={palette.muted} />
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Correo electrónico"
-              placeholderTextColor={palette.muted}
-              value={forgotEmail}
-              onChangeText={setForgotEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-
-          {forgotSent ? (
-            <Text style={[styles.success, styles.forgotMessageSpacing]}>
-              Si el correo existe, recibirás instrucciones.
-            </Text>
-          ) : null}
-          {error ? (
-            <Text style={[styles.error, styles.forgotMessageSpacing]}>{error}</Text>
-          ) : null}
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              styles.forgotPrimaryBtn,
-              pressed && styles.primaryBtnPressed,
-            ]}
-            onPress={handleForgotPassword}
-          >
-            {loading ? (
-              <ActivityIndicator color={palette.primaryText} />
-            ) : (
-              <View style={styles.btnInner}>
-                <Ionicons name="send-outline" size={16} color={palette.primaryText} />
-                <Text style={styles.primaryBtnText}>Enviar instrucciones</Text>
-              </View>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.textBtn,
-              styles.forgotBackBtn,
-              pressed && styles.textBtnPressed,
-            ]}
-            onPress={() => {
-              setScreen('login');
-              setForgotSent(false);
-              setError('');
-            }}
-          >
-            <Text style={styles.textBtnLabel}>Volver al login</Text>
-          </Pressable>
-        </View>
-      </ScreenShell>
-    );
-  }
+  /* ─── Render ─────────────────────────── */
 
   return (
-    <ScreenShell
-      mode={mode}
-      onToggleMode={onToggleMode}
-      title={screen === 'welcome' ? 'Control total de tu gimnasio' : 'Bienvenido'}
-      subtitle={
-        screen === 'welcome'
-          ? 'Acceso por NFC o QR, pagos y rutinas en una sola app.'
-          : 'Inicia sesión para acceder a tu gimnasio'
-      }
-      contentAnimatedStyle={contentAnimatedStyle}
-    >
-      {screen === 'welcome' ? (
-        <View style={styles.fullHeightBody}>
-          <View>
-            <View style={styles.welcomeVisual}>
-              <View style={styles.welcomePhone}>
-                <Ionicons name="phone-portrait-outline" size={32} color={palette.primary} />
-              </View>
-              <View style={styles.welcomePoints}>
-                <View style={styles.pointRow}>
-                  <Ionicons name="radio-outline" size={16} color={palette.primary} />
-                  <Text style={styles.pointText}>Ingreso principal con NFC</Text>
-                </View>
-                <View style={styles.pointRow}>
-                  <Ionicons name="qr-code-outline" size={16} color={palette.primary} />
-                  <Text style={styles.pointText}>Respaldo inmediato con QR</Text>
-                </View>
-                <View style={styles.pointRow}>
-                  <Ionicons name="wallet-outline" size={16} color={palette.primary} />
-                  <Text style={styles.pointText}>Pagos y rutinas en tiempo real</Text>
-                </View>
-              </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* ── Welcome ── */}
+      {activeView === 'welcome' && (
+        <Animated.View entering={FadeIn.duration(420)} exiting={FadeOut.duration(280)} style={StyleSheet.absoluteFill}>
+          <ScreenShell view="welcome" colors={colors} isDark={isDark}>
+            <View style={{ gap: spacing.lg }}>
+              <Animated.View entering={FadeInUp.delay(520).duration(380)}>
+                <WelcomeFeatureRow icon="radio-outline" label="Ingreso por NFC y código QR" colors={colors} />
+              </Animated.View>
+              <Animated.View entering={FadeInUp.delay(620).duration(380)}>
+                <WelcomeFeatureRow icon="barbell-outline" label="Rutinas personalizadas de tu coach" colors={colors} />
+              </Animated.View>
+              <Animated.View entering={FadeInUp.delay(720).duration(380)}>
+                <WelcomeFeatureRow icon="card-outline" label="Historial de pagos y planes" colors={colors} />
+              </Animated.View>
+              <Animated.View entering={FadeInUp.delay(840).duration(380)} style={{ marginTop: spacing.md }}>
+                <Button variant="primary" size="lg" fullWidth icon="arrow-forward-outline" haptic onPress={() => setScreen('login')}>
+                  Comenzar
+                </Button>
+              </Animated.View>
             </View>
-
-            <View style={styles.dots}>
-              <View style={[styles.dot, styles.dotActive]} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-            onPress={() => setScreen('login')}
-          >
-            <View style={styles.btnInner}>
-              <Ionicons name="arrow-forward-outline" size={16} color={palette.primaryText} />
-              <Text style={styles.primaryBtnText}>Comenzar</Text>
-            </View>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.fullHeightBody}>
-          <View style={styles.loginFormStack}>
-            <View style={[styles.passwordRow, styles.inputRowNoTopMargin]}>
-              <Ionicons name="mail-outline" size={17} color={palette.muted} />
-              <TextInput
-                style={styles.passwordInput}
-                placeholder="Correo electrónico"
-                placeholderTextColor={palette.muted}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-            </View>
-
-            <View style={styles.passwordRow}>
-              <Ionicons name="lock-closed-outline" size={17} color={palette.muted} />
-              <TextInput
-                style={styles.passwordInput}
-                placeholder="Contraseña"
-                placeholderTextColor={palette.muted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <Pressable
-                style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressScale]}
-                onPress={() => setShowPassword((v) => !v)}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={18}
-                  color={palette.muted}
-                />
-              </Pressable>
-            </View>
-
-            <View style={styles.inlineActions}>
-              <Pressable
-                style={({ pressed }) => [pressed && styles.textBtnPressed]}
-                onPress={() => {
-                  setScreen('forgot');
-                  setForgotEmail(email);
-                  setError('');
-                }}
-              >
-                <Text style={styles.textBtnLabel}>Olvidé mi contraseña</Text>
-              </Pressable>
-            </View>
-
-            {error ? (
-              <Text style={[styles.error, styles.loginMessageSpacing]}>{error}</Text>
-            ) : null}
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              styles.loginPrimaryBtn,
-              pressed && styles.primaryBtnPressed,
-            ]}
-            onPress={handleCredentials}
-          >
-            {loading ? (
-              <ActivityIndicator color={palette.primaryText} />
-            ) : (
-              <View style={styles.btnInner}>
-                <Ionicons name="log-in-outline" size={16} color={palette.primaryText} />
-                <Text style={styles.primaryBtnText}>Iniciar sesión</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
+          </ScreenShell>
+        </Animated.View>
       )}
-    </ScreenShell>
-  );
-}
 
-function makeStyles(c: Palette) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: c.bg,
-    },
-    wrapper: {
-      flex: 1,
-      width: '100%',
-      paddingHorizontal: 20,
-      paddingTop: 10,
-      paddingBottom: 12,
-      justifyContent: 'flex-start',
-      gap: 14,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 2,
-    },
-    brandWrap: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    brandIconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
-      backgroundColor: c.surface,
-      borderWidth: 1,
-      borderColor: c.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    brand: {
-      color: c.text,
-      fontSize: 20,
-      fontWeight: '800',
-    },
-    brandSub: {
-      color: c.muted,
-      fontSize: 13,
-      marginTop: 2,
-    },
-    modeBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    card: {
-      flex: 1,
-      backgroundColor: 'transparent',
-      borderWidth: 0,
-      borderRadius: 0,
-      paddingHorizontal: 0,
-      paddingVertical: 0,
-      gap: 10,
-    },
-    title: {
-      color: c.text,
-      fontSize: 26,
-      fontWeight: '800',
-    },
-    subtitle: {
-      color: c.muted,
-      fontSize: 14,
-      lineHeight: 20,
-      marginBottom: 2,
-    },
-    formBlock: {
-      flex: 1,
-      marginTop: 8,
-    },
-    fullHeightBody: {
-      flex: 1,
-      justifyContent: 'space-between',
-      gap: 14,
-    },
-    welcomeVisual: {
-      backgroundColor: c.surfaceAlt,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: c.border,
-      padding: 14,
-      gap: 12,
-    },
-    welcomePhone: {
-      width: 52,
-      height: 52,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: c.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: c.surface,
-    },
-    welcomePoints: {
-      gap: 8,
-    },
-    pointRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    pointText: {
-      color: c.text,
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    dots: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 8,
-    },
-    dot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: c.border,
-    },
-    dotActive: {
-      width: 20,
-      backgroundColor: c.primary,
-    },
-    input: {
-      backgroundColor: c.surfaceAlt,
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
-      fontSize: 15,
-      color: c.text,
-    },
-    passwordRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      backgroundColor: c.surfaceAlt,
-      borderWidth: 1,
-      borderColor: c.border,
-      overflow: 'hidden',
-      paddingLeft: 14,
-      marginTop: 10,
-    },
-    inputRowNoTopMargin: {
-      marginTop: 0,
-    },
-    loginFormStack: {
-      width: '100%',
-    },
-    loginPrimaryBtn: {
-      marginTop: 28,
-    },
-    loginMessageSpacing: {
-      marginTop: 16,
-    },
-    forgotStack: {
-      flex: 1,
-      width: '100%',
-    },
-    forgotMessageSpacing: {
-      marginTop: 16,
-    },
-    forgotPrimaryBtn: {
-      marginTop: 28,
-    },
-    forgotBackBtn: {
-      marginTop: 20,
-      paddingVertical: 12,
-    },
-    passwordInput: {
-      flex: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 13,
-      color: c.text,
-      fontSize: 15,
-    },
-    passwordToggle: {
-      borderLeftWidth: 1,
-      borderLeftColor: c.border,
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    inlineActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      marginTop: 16,
-      paddingVertical: 4,
-    },
-    primaryBtn: {
-      backgroundColor: c.primary,
-      borderRadius: 12,
-      paddingVertical: 13,
-      alignItems: 'center',
-      marginTop: 2,
-    },
-    primaryBtnPressed: {
-      opacity: 0.92,
-      transform: [{ scale: 0.985 }],
-    },
-    pressScale: {
-      transform: [{ scale: 0.97 }],
-    },
-    btnInner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    primaryBtnText: {
-      color: c.primaryText,
-      fontSize: 15,
-      fontWeight: '700',
-    },
-    textBtn: {
-      alignItems: 'center',
-      marginTop: 2,
-      paddingVertical: 4,
-    },
-    textBtnPressed: {
-      opacity: 0.7,
-    },
-    textBtnLabel: {
-      color: c.primary,
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    error: {
-      color: c.danger,
-      fontSize: 13,
-      textAlign: 'center',
-      fontWeight: '500',
-      marginTop: 8,
-    },
-    success: {
-      color: c.primary,
-      fontSize: 13,
-      textAlign: 'center',
-      fontWeight: '600',
-      marginTop: 8,
-    },
-  });
+      {/* ── Login ── */}
+      {activeView === 'login' && (
+        <Animated.View entering={FadeIn.duration(420)} exiting={FadeOut.duration(280)} style={StyleSheet.absoluteFill}>
+          <ScreenShell view="login" colors={colors} isDark={isDark}>
+            <View style={{ gap: spacing.lg }}>
+              <Animated.View entering={FadeInDown.delay(480).duration(380)}>
+                <Text variant="h2" style={{ marginBottom: spacing.xs }}>Inicia sesión</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>Usa el correo que te dio tu gimnasio.</Text>
+              </Animated.View>
+
+              <Animated.View entering={FadeInUp.delay(580).duration(380)} style={{ gap: spacing.md }}>
+                <Input icon="mail-outline" placeholder="tu@correo.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+                <Input icon="lock-closed-outline" placeholder="Contraseña" value={password} onChangeText={setPassword} secureToggle secureTextEntry />
+                <Pressable onPress={() => { setScreen('forgot'); setForgotEmail(email); setError(''); }} style={{ alignSelf: 'flex-end', paddingVertical: spacing.xs }} accessibilityRole="button">
+                  <Text variant="caption" color={colors.primary} weight="semibold">Olvidé mi contraseña</Text>
+                </Pressable>
+              </Animated.View>
+
+              {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+
+              <Animated.View entering={FadeInUp.delay(700).duration(380)}>
+                <Button variant="primary" size="lg" fullWidth icon="log-in-outline" loading={loading} haptic onPress={handleCredentials}>
+                  Iniciar sesión
+                </Button>
+              </Animated.View>
+
+              <Animated.View entering={FadeIn.delay(820).duration(350)}>
+                <Text variant="caption" color={colors.textTertiary} align="center" style={{ lineHeight: 20 }}>
+                  ¿No tienes cuenta? Pide acceso en la recepción de tu gimnasio.
+                </Text>
+              </Animated.View>
+            </View>
+          </ScreenShell>
+        </Animated.View>
+      )}
+
+      {/* ── Forgot ── */}
+      {activeView === 'forgot' && (
+        <Animated.View entering={FadeIn.duration(420)} exiting={FadeOut.duration(280)} style={StyleSheet.absoluteFill}>
+          <ScreenShell view="forgot" colors={colors} isDark={isDark}>
+            <View style={{ gap: spacing.lg }}>
+              <Animated.View entering={FadeInDown.delay(480).duration(380)}>
+                <Text variant="h2" style={{ marginBottom: spacing.xs }}>¿Olvidaste tu contraseña?</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>
+                  Si tu cuenta tiene correo registrado, te enviaremos instrucciones para restablecerla. Si no, pide ayuda en recepción o con un asesor.
+                </Text>
+              </Animated.View>
+
+              {!forgotSent ? (
+                <>
+                  <Animated.View entering={FadeInUp.delay(580).duration(380)}>
+                    <Input icon="mail-outline" placeholder="tu@correo.com" value={forgotEmail} onChangeText={setForgotEmail} autoCapitalize="none" keyboardType="email-address" />
+                  </Animated.View>
+                  {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+                  <Animated.View entering={FadeInUp.delay(700).duration(380)} style={{ gap: spacing.md }}>
+                    <Button variant="primary" size="lg" fullWidth icon="send-outline" loading={loading} haptic onPress={handleForgotPassword}>
+                      Enviar instrucciones
+                    </Button>
+                    <Button variant="ghost" onPress={() => { setScreen('login'); setForgotSent(false); setError(''); }}>
+                      Volver al inicio de sesión
+                    </Button>
+                  </Animated.View>
+                </>
+              ) : (
+                <Animated.View entering={FadeIn.duration(360)} style={{ gap: spacing.lg }}>
+                  <View style={{ backgroundColor: colors.successSurface, borderWidth: 1, borderColor: colors.success + '44', borderRadius: radius.lg, padding: spacing.lg }}>
+                    <Text variant="body" style={{ color: colors.success, fontWeight: '600', lineHeight: 22 }}>
+                      Si el correo existe en nuestro sistema, recibirás instrucciones en tu bandeja.
+                    </Text>
+                  </View>
+                  <Button variant="secondary" size="lg" fullWidth onPress={() => { setScreen('login'); setForgotSent(false); setError(''); }}>
+                    Volver al inicio de sesión
+                  </Button>
+                </Animated.View>
+              )}
+            </View>
+          </ScreenShell>
+        </Animated.View>
+      )}
+
+      {/* ── MFA ── */}
+      {activeView === 'mfa' && (
+        <Animated.View entering={FadeIn.duration(420)} exiting={FadeOut.duration(280)} style={StyleSheet.absoluteFill}>
+          <ScreenShell view="mfa" colors={colors} isDark={isDark}>
+            <View style={{ gap: spacing.xl }}>
+              <Animated.View entering={FadeInDown.delay(480).duration(380)}>
+                <Text variant="h2" style={{ marginBottom: spacing.xs }}>Código de verificación</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>Ingresa el código de tu app autenticadora.</Text>
+              </Animated.View>
+
+              <Animated.View entering={FadeInUp.delay(600).duration(400)}>
+                <OtpInput length={OTP_LENGTH} value={otp} onChange={setOtp} />
+              </Animated.View>
+
+              <Animated.View entering={FadeIn.delay(720).duration(300)}>
+                <Text variant="caption" color={mfaCountdown < 60 ? colors.destructive : colors.textTertiary} align="center">
+                  Código válido por {fmtCountdown(mfaCountdown)}
+                </Text>
+              </Animated.View>
+
+              {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+
+              <Animated.View entering={FadeInUp.delay(820).duration(380)} style={{ gap: spacing.md }}>
+                <Button variant="primary" size="lg" fullWidth icon="arrow-forward" loading={loading} haptic onPress={handleMfaVerify}>
+                  Continuar
+                </Button>
+                <Button variant="ghost" onPress={resetAuthFlows}>Volver al login</Button>
+              </Animated.View>
+            </View>
+          </ScreenShell>
+        </Animated.View>
+      )}
+
+      {/* ── Password change ── */}
+      {activeView === 'password' && (
+        <Animated.View entering={FadeIn.duration(420)} exiting={FadeOut.duration(280)} style={StyleSheet.absoluteFill}>
+          <ScreenShell view="password" colors={colors} isDark={isDark}>
+            <View style={{ gap: spacing.lg }}>
+              <Animated.View entering={FadeInDown.delay(480).duration(380)}>
+                <Text variant="h2" style={{ marginBottom: spacing.xs }}>Actualiza tu contraseña</Text>
+                <Text variant="body" color={colors.textSecondary} style={{ lineHeight: 22 }}>Elige una contraseña segura de al menos 8 caracteres.</Text>
+              </Animated.View>
+
+              <Animated.View entering={FadeInUp.delay(580).duration(380)} style={{ gap: spacing.md }}>
+                <Input icon="lock-closed-outline" placeholder="Nueva contraseña" value={newPassword} onChangeText={setNewPassword} secureToggle secureTextEntry />
+                <Input icon="checkmark-circle-outline" placeholder="Repetir contraseña" value={newPassword2} onChangeText={setNewPassword2} secureTextEntry />
+              </Animated.View>
+
+              <Animated.View entering={FadeIn.delay(700).duration(300)}>
+                <PasswordStrength password={newPassword} />
+              </Animated.View>
+
+              {error ? <ErrorBanner message={error} onDismiss={() => setError('')} /> : null}
+
+              <Animated.View entering={FadeInUp.delay(800).duration(380)}>
+                <Button variant="primary" size="lg" fullWidth icon="save-outline" loading={loading} haptic onPress={handlePasswordChange}>
+                  Guardar
+                </Button>
+              </Animated.View>
+            </View>
+          </ScreenShell>
+        </Animated.View>
+      )}
+
+      {/* Toggle persiste sobre todas las pantallas */}
+      <FloatingThemeToggle toggleMode={toggleMode} isDark={isDark} />
+    </View>
+  );
 }

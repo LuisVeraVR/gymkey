@@ -49,6 +49,11 @@ function defaultApiBaseUrl(): string {
 
 export const API_BASE_URL = envUrl || defaultApiBaseUrl();
 
+/** Origen para Socket.IO (mismo host que la API, sin sufijo `/api`). */
+export function getSocketOrigin(): string {
+  return API_BASE_URL.replace(/\/api\/?$/, '');
+}
+
 let onSessionExpired: (() => void) | null = null;
 
 export function setSessionExpiredHandler(fn: (() => void) | null) {

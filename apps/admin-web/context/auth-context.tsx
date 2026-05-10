@@ -125,8 +125,9 @@ export function AuthProvider({ children, initialUser }: { children: React.ReactN
 
   useEffect(() => {
     const publicRoutes = ['/login', '/forgot-password'];
+    const isPublicGym = pathname.startsWith('/gym/');
     // If not loading, no user, and not on a public route -> redirect to login
-    if (!loading && !user && !publicRoutes.includes(pathname)) {
+    if (!loading && !user && !publicRoutes.includes(pathname) && !isPublicGym) {
       // Clear invalid token to prevent middleware redirect loop
       Cookies.remove('token');
       router.push('/login');

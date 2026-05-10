@@ -49,8 +49,9 @@ interface Settings {
     themeColor?: string;
     
     // Security
-    allowPublicRegistration?: boolean;
+    showPublicPortal?: boolean;
     requireMfa?: boolean;
+    offlineToleranceMinutes?: number;
     
     // Social
     social?: {
@@ -93,6 +94,9 @@ export default function SettingsPage() {
         const res = await api.get('/settings');
         const data = res.data;
         if (!data.config.social) data.config.social = {};
+        if (data.config.showPublicPortal === undefined) {
+          data.config.showPublicPortal = Boolean(data.config.allowPublicRegistration);
+        }
         setSettings(data);
 
         if (data?.config?.currency) {
@@ -526,18 +530,38 @@ export default function SettingsPage() {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                       <div className="space-y-1">
-                        <h3 className="font-medium">Registro Público</h3>
-                        <p className="text-sm text-muted-foreground">Permitir que nuevos usuarios se registren libremente</p>
+                        <h3 className="font-medium">Mostrar Portal Público</h3>
+                        <p className="text-sm text-muted-foreground">Habilitar la página pública /gym/[slug] de este gimnasio</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
                           type="checkbox" 
                           className="sr-only peer"
-                          checked={settings.config.allowPublicRegistration || false}
-                          onChange={(e) => handleConfigChange('allowPublicRegistration', e.target.checked)}
+                          checked={settings.config.showPublicPortal || false}
+                          onChange={(e) => handleConfigChange('showPublicPortal', e.target.checked)}
                         />
                         <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                       </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border border-border rounded-lg gap-4">
+                      <div className="space-y-1">
+                        <h3 className="font-medium">Tolerancia Offline QR (min)</h3>
+                        <p className="text-sm text-muted-foreground">Margen recomendado para validación cuando el miembro usa QR en modo offline</p>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={settings.config.offlineToleranceMinutes ?? 5}
+                        onChange={(e) =>
+                          handleConfigChange(
+                            'offlineToleranceMinutes',
+                            Number(e.target.value) || 5,
+                          )
+                        }
+                        className="w-24 h-8 px-2 text-sm bg-background border border-border rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      />
                     </div>
 
                     <div className="flex items-center justify-between p-4 border border-border rounded-lg">

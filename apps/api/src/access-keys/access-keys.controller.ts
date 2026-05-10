@@ -44,10 +44,18 @@ export class AccessKeysController {
     UserRole.SUPER_ADMIN,
     UserRole.COACH,
   )
-  async validateKey(@Request() req: any, @Body('token') token: string) {
+  async validateKey(
+    @Request() req: any,
+    @Body('token') token: string,
+    @Body('method') method?: string,
+  ) {
     if (!token) {
       throw new UnauthorizedException('Token requerido');
     }
-    return this.accessKeysService.validateKey(token, req.user.tenantId);
+    return this.accessKeysService.validateKey(
+      token,
+      req.user.tenantId,
+      method,
+    );
   }
 }

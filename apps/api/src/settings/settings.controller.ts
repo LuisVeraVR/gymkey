@@ -36,6 +36,11 @@ export class SettingsController {
     return settings;
   }
 
+  @Get('runtime-config')
+  getRuntimeConfig(@Request() req: { user: { tenantId: string } }) {
+    return this.settingsService.getRuntimeConfig(req.user.tenantId);
+  }
+
   @Patch()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
   updateSettings(

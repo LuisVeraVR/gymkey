@@ -14,8 +14,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
-import { UserRole, Prisma } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { UserRole } from '@prisma/client';
+import { CheckLimit } from '../platform/decorators/check-limit.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -35,37 +35,52 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post('invite')
+  @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  invite(@Request() req: any, @Body() body: any) {
+    return this.usersService.inviteMember({
+      tenantId: req.user.tenantId,
+      actorId: req.user.sub || req.user.userId || req.user.id,
+      actorName: req.user.name || req.user.email,
+      memberName: body.name,
+      email: body.email,
+      planId: body.planId || undefined,
+      temporaryPassword: body.temporaryPassword || undefined,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Post()
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
+  @CheckLimit('maxMembers', 'role')
+  @CheckLimit('maxStaff', 'role')
   async create(@Request() req: any, @Body() createUserDto: any) {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-
-    const data: Prisma.UserCreateInput = {
-      ...createUserDto,
-      password: hashedPassword,
-      tenant: { connect: { id: req.user.tenantId } },
-    };
-
     // Prevent creating admins if not super admin (basic check)
     if (
-      data.role === UserRole.SUPER_ADMIN &&
+      createUserDto.role === UserRole.SUPER_ADMIN &&
       req.user.role !== UserRole.SUPER_ADMIN
     ) {
       throw new ForbiddenException('Cannot create Super Admin');
     }
 
-    return this.usersService.create(data);
+    return this.usersService.createForTenant({
+      tenantId: req.user.tenantId,
+      name: createUserDto.name,
+      email: createUserDto.email,
+      password: createUserDto.password,
+      role: createUserDto.role,
+      isActive: createUserDto.isActive,
+      mustChangePassword:
+        createUserDto.mustChangePassword ??
+        createUserDto.role === UserRole.MEMBER,
+      planId: createUserDto.planId || undefined,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id')
   @Roles(UserRole.GYM_ADMIN, UserRole.SUPER_ADMIN)
   async update(@Param('id') id: string, @Body() updateUserDto: any) {
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-    } else {
-      delete updateUserDto.password;
-    }
     return this.usersService.update(id, updateUserDto);
   }
 

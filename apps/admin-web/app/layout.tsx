@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { PlatformProvider } from "@/context/platform-context";
 import { SocketProvider } from "@/context/socket-context";
 import { SettingsProvider } from "@/context/settings-context";
 import MainLayout from "@/components/layout/MainLayout";
@@ -33,12 +34,33 @@ async function getUser() {
   }
 }
 
+async function getPlatformBootstrap() {
+  try {
+    const [subscriptionRes, usageRes] = await Promise.all([
+      serverApi.get('/platform/subscription'),
+      serverApi.get('/platform/usage'),
+    ]);
+    return {
+      subscription: subscriptionRes.data,
+      usage: usageRes.data,
+    };
+  } catch (_error) {
+    return {
+      subscription: null,
+      usage: null,
+    };
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const user = await getUser();
+  const platform = user
+    ? await getPlatformBootstrap()
+    : { subscription: null, usage: null };
 
   return (
     <html lang="es" suppressHydrationWarning>
@@ -49,11 +71,16 @@ export default async function RootLayout({
           <I18nProvider>
             <AlertProvider>
               <AuthProvider initialUser={user}>
-                <SettingsProvider>
-                  <SocketProvider>
-                    <MainLayout>{children}</MainLayout>
-                  </SocketProvider>
-                </SettingsProvider>
+                <PlatformProvider
+                  initialSubscription={platform.subscription}
+                  initialUsage={platform.usage}
+                >
+                  <SettingsProvider>
+                    <SocketProvider>
+                      <MainLayout>{children}</MainLayout>
+                    </SocketProvider>
+                  </SettingsProvider>
+                </PlatformProvider>
               </AuthProvider>
             </AlertProvider>
           </I18nProvider>

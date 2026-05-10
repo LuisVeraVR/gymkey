@@ -2,11 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentStatus, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async create(
     createPaymentDto: CreatePaymentDto,
@@ -63,8 +67,8 @@ export class PaymentsService {
     const endDate = new Date();
     endDate.setDate(startDate.getDate() + plan.duration);
 
-    const existingSub = await this.prisma.subscription.findUnique({
-      where: { userId: payment.userId },
+    const existingSub = await this.prisma.subscription.findFirst({
+      where: { userId: payment.userId, isCurrent: true },
     });
 
     let sub;
@@ -84,6 +88,7 @@ export class PaymentsService {
           userId: payment.userId,
           planId: plan.id,
           status: SubscriptionStatus.ACTIVE,
+          isCurrent: true,
           startDate,
           endDate,
         },
@@ -107,6 +112,23 @@ export class PaymentsService {
           userId: payment.userId,
         },
       });
+    }
+
+    const amountStr = Number(payment.amount).toLocaleString('es', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    try {
+      await this.notifications.createAndEmit({
+        userId: payment.userId,
+        tenantId: payment.tenantId,
+        title: 'Pago recibido',
+        message: `Pago recibido de ${payment.currency} ${amountStr}`,
+        type: 'success',
+        metadata: { paymentId: payment.id, planId: plan.id },
+      });
+    } catch {
+      /* no bloquear confirmación si falla la notificación */
     }
 
     return { payment, subscription: sub };

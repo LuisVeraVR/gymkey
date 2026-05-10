@@ -1,38 +1,117 @@
 'use client';
 
 import { useAuth } from '@/context/auth-context';
-import { useState, useEffect, useRef } from 'react';
+import { useSocket } from '@/context/socket-context';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Globe, LogOut, Settings, Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
-// Mock notifications type
-interface Notification {
+interface NotificationItem {
   id: string;
   title: string;
   message: string;
   time: string;
-  type: 'info' | 'success' | 'warning';
+  type: string;
   read: boolean;
+}
+
+function formatRelativeTime(iso: string) {
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  if (diffMs < 0) return 'Ahora';
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return 'Hace un momento';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `Hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Hace ${h} h`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `Hace ${days} d`;
+  return d.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 export default function Topbar() {
   const { user, logout } = useAuth();
+  const { socket } = useSocket();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const notificationRef = useRef<HTMLDivElement>(null);
 
+  const refreshNotifications = useCallback(async () => {
+    if (!user) return;
+    setNotifLoading(true);
+    try {
+      const [listRes, countRes] = await Promise.all([
+        api.get<{ items: Array<{ id: string; title: string; message: string; type: string; read: boolean; createdAt: string }> }>(
+          '/notifications?limit=10',
+        ),
+        api.get<{ count: number }>('/notifications/unread-count'),
+      ]);
+      setNotifications(
+        listRes.data.items.map((n) => ({
+          ...n,
+          time: formatRelativeTime(n.createdAt),
+        })),
+      );
+      setUnreadCount(countRes.data.count);
+    } catch {
+      /* silencioso: sin sesión o red */
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [user]);
+
   // Prevent hydration mismatch
   useEffect(() => {
     const id = setTimeout(() => setMounted(true), 0);
     return () => clearTimeout(id);
   }, []);
+
+  useEffect(() => {
+    refreshNotifications();
+  }, [refreshNotifications]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onNotification = (payload: {
+      id: string;
+      title: string;
+      message: string;
+      type: string;
+      read: boolean;
+      createdAt: string;
+    }) => {
+      setNotifications((prev) => {
+        if (prev.some((p) => p.id === payload.id)) return prev;
+        const next: NotificationItem = {
+          id: payload.id,
+          title: payload.title,
+          message: payload.message,
+          type: payload.type,
+          read: payload.read,
+          time: formatRelativeTime(payload.createdAt),
+        };
+        return [next, ...prev].slice(0, 10);
+      });
+      if (!payload.read) {
+        setUnreadCount((c) => c + 1);
+      }
+    };
+    socket.on('notification', onNotification);
+    return () => {
+      socket.off('notification', onNotification);
+    };
+  }, [socket]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,14 +129,29 @@ export default function Topbar() {
     };
   }, [showNotifications]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markAsRead = async (id: string) => {
+    const wasUnread = notifications.some((n) => n.id === id && !n.read);
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+      if (wasUnread) {
+        setUnreadCount((c) => Math.max(0, c - 1));
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await api.post('/notifications/mark-all-read');
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch {
+      /* ignore */
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -133,16 +227,13 @@ export default function Topbar() {
               <div className="absolute right-0 mt-3 w-80 bg-card/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 animate-fadeIn overflow-hidden">
                 <div className="p-4 border-b border-border/50 flex items-center justify-between bg-muted/30">
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-semibold text-foreground">Notificaciones</h3>
-                      <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        Demo
-                      </span>
-                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">Notificaciones</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {notifications.length === 0
-                        ? 'Sin conexión en vivo al backend de notificaciones'
-                        : `${unreadCount} sin leer`}
+                      {notifLoading
+                        ? 'Cargando…'
+                        : unreadCount > 0
+                          ? `${unreadCount} sin leer`
+                          : 'Al día'}
                     </p>
                   </div>
                   {unreadCount > 0 && (
@@ -160,8 +251,7 @@ export default function Topbar() {
                     <div className="p-8 text-center text-muted-foreground">
                       <Bell className="w-8 h-8 mx-auto mb-3 opacity-20" />
                       <p className="text-xs leading-relaxed max-w-[240px] mx-auto">
-                        Las notificaciones en tiempo real se integrarán con el gateway de
-                        notificaciones de la API. Por ahora esta lista está vacía.
+                        No hay notificaciones recientes.
                       </p>
                     </div>
                   ) : (
@@ -175,7 +265,8 @@ export default function Topbar() {
                           <div className="flex gap-3">
                             <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
                               notification.type === 'success' ? 'bg-green-500' :
-                              notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
+                              notification.type === 'warning' ? 'bg-yellow-500' :
+                              notification.type === 'error' ? 'bg-destructive' : 'bg-blue-500'
                             }`} />
                             <div className="flex-1 space-y-1">
                               <p className={`text-sm ${!notification.read ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground'}`}>
@@ -199,8 +290,12 @@ export default function Topbar() {
                 </div>
                 
                 <div className="p-2 border-t border-border/50 bg-muted/30">
-                  <button className="w-full py-1.5 text-xs text-center text-muted-foreground hover:text-primary transition-colors">
-                    Ver todas las notificaciones
+                  <button
+                    type="button"
+                    onClick={() => refreshNotifications()}
+                    className="w-full py-1.5 text-xs text-center text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    Actualizar
                   </button>
                 </div>
               </div>
